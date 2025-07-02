@@ -3,28 +3,31 @@ import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "./index.css";
 
-// Impor Halaman & Layout
+// Impor Layout & Halaman
+import MainLayout from "./components/layout/MainLayout.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
-import MainLayout from "./components/layout/MainLayout.jsx"; // <-- 1. IMPORT LAYOUT BARU
+import KaderPage from "./pages/KaderPage.jsx";
 
-// Buat 'peta' rute aplikasi kita
 const router = createBrowserRouter([
     // Rute publik (tanpa sidebar & navbar)
     { path: "/", element: <HomePage /> },
     { path: "/login", element: <LoginPage /> },
 
-    // Rute yang dilindungi (menggunakan layout)
+    // Rute yang menggunakan MainLayout
     {
-        element: <MainLayout />, // <-- 2. JADIKAN LAYOUT SEBAGAI INDUK
+        element: <MainLayout />, // <-- Layout sebagai 'induk'
         children: [
-            // <-- 3. BUAT HALAMAN DI DALAMNYA SEBAGAI ANAK
+            // <-- Halaman-halaman di dalamnya sebagai 'anak'
             {
                 path: "/dashboard",
                 element: <DashboardPage />,
             },
-            // Nanti rute lain seperti /kader, /ibu, dll. kita tambahkan di sini
+            {
+                path: "/kader",
+                element: <KaderPage />,
+            },
         ],
     },
 ]);

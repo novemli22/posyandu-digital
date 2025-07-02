@@ -9,8 +9,7 @@ export default function MainLayout() {
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Navbar />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
-                    {/* "Jendela Ajaib" untuk menampilkan konten halaman */}
-                    <Outlet />
+                    <Outlet /> {/* "Bingkai foto" untuk konten halaman */}
                 </main>
             </div>
         </div>
