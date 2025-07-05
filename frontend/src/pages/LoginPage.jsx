@@ -3,20 +3,17 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
-    // State untuk menyimpan input email & password dari pengguna
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    // State untuk menyimpan pesan error jika login gagal
     const [error, setError] = useState("");
-    const navigate = useNavigate(); // Hook untuk mengarahkan pengguna ke halaman lain
+    const navigate = useNavigate();
 
-    // Fungsi ini akan berjalan saat tombol "Login" di-klik
     const handleLogin = async (e) => {
-        e.preventDefault(); // Mencegah form me-refresh halaman
-        setError(""); // Bersihkan pesan error lama
+        e.preventDefault();
+        setError("");
 
         try {
-            // Kirim data ke API Laravel kita menggunakan Axios
+            // Kita asumsikan backend Laravel berjalan di port 8000
             const response = await axios.post(
                 "http://localhost:8000/api/login",
                 {
@@ -25,20 +22,16 @@ export default function LoginPage() {
                 }
             );
 
-            // Jika berhasil...
-            console.log("Login berhasil!", response.data);
-
-            // Simpan "tiket masuk" (token) dan data user di browser
+            // Simpan token dan data user di browser
             localStorage.setItem("auth_token", response.data.access_token);
             localStorage.setItem(
                 "auth_user",
                 JSON.stringify(response.data.user)
             );
 
-            // Arahkan pengguna ke halaman dashboard (halaman ini akan kita buat nanti)
-            navigate("/dashboard");
+            // Arahkan pengguna ke dashboard admin
+            navigate("/admin/dashboard");
         } catch (err) {
-            // Jika gagal...
             if (err.response && err.response.status === 401) {
                 setError("Email atau password salah.");
             } else {
@@ -52,7 +45,7 @@ export default function LoginPage() {
         <div className="flex min-h-screen items-center justify-center bg-gray-100">
             <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg">
                 <h2 className="mb-6 text-center text-3xl font-bold text-gray-900">
-                    Login ke Akun Anda
+                    Login Admin
                 </h2>
                 <form onSubmit={handleLogin}>
                     {error && (

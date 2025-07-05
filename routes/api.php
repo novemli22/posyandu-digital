@@ -1,8 +1,11 @@
 <?php
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Api\AnakController;
+use App\Http\Controllers\Api\IbuController;
 use App\Http\Controllers\Api\KaderController;
 use App\Http\Controllers\Api\PosyanduController;
+use App\Http\Controllers\Api\WilayahController;
+use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -18,18 +21,17 @@ Route::post('/login', [AuthController::class, 'login']);
 // --- SEMUA RUTE LAIN YANG BUTUH LOGIN HARUS ADA DI DALAM GRUP INI ---
 Route::middleware('auth:sanctum')->group(function () {
     
-    // Rute untuk mendapatkan data user yang sedang login
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
+    Route::get('/user', fn (Request $request) => $request->user());
 
-    // Rute untuk data Kader
-    Route::get('/kaders', [KaderController::class, 'index']);
-    Route::post('/kaders', [KaderController::class, 'store']);
-    Route::delete('/kaders/{kader}', [KaderController::class, 'destroy']);
-    
-    // Rute untuk data Posyandu
-    Route::get('/posyandu', [PosyanduController::class, 'index']);
-    
-    // Nanti rute untuk Ibu, Anak, Pemeriksaan, dll. juga akan kita taruh di sini
+    // Rute untuk Wilayah (Cascading Dropdown)
+    Route::get('/wilayah/provinces', [WilayahController::class, 'provinces']);
+    Route::get('/wilayah/regencies', [WilayahController::class, 'regencies']);
+    Route::get('/wilayah/districts', [WilayahController::class, 'districts']);
+    Route::get('/wilayah/villages', [WilayahController::class, 'villages']);
+
+    // Rute CRUD lengkap menggunakan apiResource
+    Route::apiResource('/posyandus', PosyanduController::class);
+    Route::apiResource('/kaders', KaderController::class);
+    Route::apiResource('/ibus', IbuController::class);
+    Route::apiResource('/anaks', AnakController::class);
 });
