@@ -10,43 +10,37 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
-use Carbon\Carbon; // <-- Import Carbon untuk manipulasi tanggal
+use Carbon\Carbon;
 
 class IbuController extends Controller
 {
-    /**
-     * Menampilkan daftar semua data Ibu.
-     */
     public function index()
     {
         return Ibu::with(['user', 'posyandu'])->latest()->get();
     }
 
-    /**
-     * Menyimpan data Ibu baru.
-     */
     public function store(Request $request)
     {
         $validatedData = $request->validate([
             // Data Diri & Akun
             'nama_lengkap' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'is_nik_exists' => ['required', 'boolean'],
-            'nik' => ['exclude_if:is_nik_exists,false', 'required', 'string', 'size:16', 'unique:ibus,nik'],
-            'nomor_kk' => ['required', 'string', 'max:20'],
+            'nik' => ['exclude_if:is_nik_exists,false', 'required', 'string', 'size:16', Rule::unique('ibus', 'nik'), Rule::unique('kaders', 'nik'), Rule::unique('anaks', 'nik')],
+            'nomor_kk' => ['exclude_if:is_nik_exists,false', 'required', 'string', 'max:20', Rule::unique('ibus', 'nomor_kk')],
             'tanggal_lahir' => ['required', 'date'],
-            'golongan_darah' => ['required', 'string', 'max:3'],
+            'golongan_darah' => ['required', 'string', 'max:10'],
             'pendidikan' => ['nullable', 'string'],
             'pekerjaan' => ['nullable', 'string'],
             
             // Data Suami
             'nama_suami' => ['required', 'string', 'max:255'],
             'nik_suami' => ['nullable', 'string', 'size:16'],
-            'nomor_hp_suami' => ['nullable', 'string', 'max:25'],
+            'nomor_hp_suami' => ['required', 'string', 'max:25'],
 
             // Data Kehamilan
-            'kehamilan_ke' => ['required', 'integer'],
+            'kehamilan_ke' => ['required', 'integer', 'min:1'],
             'hpht' => ['required', 'date'],
             'bb_awal' => ['required', 'numeric'],
             'tb_awal' => ['required', 'numeric'],
@@ -63,11 +57,15 @@ class IbuController extends Controller
             'nomor_jaminan_kesehatan' => ['nullable', 'string'],
             'faskes_tk1' => ['nullable', 'string'],
             'faskes_rujukan' => ['nullable', 'string'],
+            'no_registrasi_kohort' => ['nullable', 'string', 'unique:ibus,no_registrasi_kohort'],
+            'alamat_lengkap' => ['required', 'string'],
+            'rt' => ['required', 'string', 'max:3'],
+            'rw' => ['required', 'string', 'max:3'],
         ]);
 
         try {
             DB::beginTransaction();
-            // Buat akun user untuk Ibu
+            // 1. Buat data untuk tabel 'users'
             $user = User::create([
                 'name' => $validatedData['nama_lengkap'],
                 'email' => $validatedData['email'],
@@ -75,12 +73,16 @@ class IbuController extends Controller
                 'role' => 'IBU',
             ]);
 
-            // Hitung HPL dengan Rumus Naegele
+            // 2. Hitung HPL
             $hpl = Carbon::parse($validatedData['hpht'])->addDays(7)->subMonths(3)->addYear();
             
-            $ibu = new Ibu($validatedData);
-            $ibu->hpl = $hpl; // Masukkan hasil perhitungan HPL
-            $ibu->user()->associate($user); // Hubungkan dengan akun user
+            // 3. Buat data Ibu dengan data yang relevan saja
+            // PERBAIKAN: Kita kecualikan field yang tidak ada di tabel 'ibus'
+            $ibuData = $request->except(['email', 'password', 'password_confirmation', 'village_id']);
+            
+            $ibu = new Ibu($ibuData);
+            $ibu->hpl = $hpl;
+            $ibu->user_id = $user->id; // Hubungkan dengan user yang baru dibuat
             $ibu->save();
             
             DB::commit();
@@ -92,38 +94,30 @@ class IbuController extends Controller
         }
     }
 
-    /**
-     * Memperbarui data Ibu.
-     */
     public function update(Request $request, Ibu $ibu)
     {
-        // Validasi untuk update (mirip dengan store, tapi sesuaikan)
         $validatedData = $request->validate([
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($ibu->user_id)],
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
-            'nik' => ['nullable', 'string', 'size:16', Rule::unique('ibus')->ignore($ibu->id)],
-            // ... tambahkan validasi lain ...
+            'is_nik_exists' => ['required', 'boolean'],
+            'nik' => ['exclude_if:is_nik_exists,false', 'required', 'string', 'size:16', Rule::unique('ibus')->ignore($ibu->id), Rule::unique('kaders', 'nik'), Rule::unique('anaks', 'nik')],
+            'nomor_kk' => ['exclude_if:is_nik_exists,false', 'required', 'string', 'max:20', Rule::unique('ibus', 'nomor_kk')->ignore($ibu->id)],
+            // ...tambahkan semua validasi lain di sini...
         ]);
 
         try {
             DB::beginTransaction();
-
-            // Update data user jika ada
             if ($ibu->user) {
-                $ibu->user->update([
-                    'name' => $validatedData['nama_lengkap'],
-                    'email' => $validatedData['email'],
-                ]);
+                $ibu->user->update(['name' => $validatedData['nama_lengkap'], 'email' => $validatedData['email']]);
                 if ($request->filled('password')) {
                     $ibu->user->update(['password' => Hash::make($request->password)]);
                 }
             }
             
-            // Update data ibu
-            $ibu->update($validatedData);
+            // PERBAIKAN: Kita kecualikan field yang tidak ada di tabel 'ibus'
+            $ibu->update($request->except(['email', 'password', 'password_confirmation', 'village_id']));
 
-            // Hitung ulang HPL jika HPHT diubah
             if ($request->has('hpht')) {
                 $ibu->hpl = Carbon::parse($request->hpht)->addDays(7)->subMonths(3)->addYear();
                 $ibu->save();
@@ -137,20 +131,13 @@ class IbuController extends Controller
         }
     }
 
-    /**
-     * Menghapus data Ibu.
-     */
     public function destroy(Ibu $ibu)
     {
-        // Fungsi destroy tetap sama
         try {
             DB::beginTransaction();
-            $user = $ibu->user;
+            if ($ibu->user) { $ibu->user->delete(); }
             $ibu->anaks()->delete();
             $ibu->delete();
-            if ($user) {
-                $user->delete();
-            }
             DB::commit();
             return response()->json(['message' => 'Data Ibu dan semua data anaknya berhasil dihapus.']);
         } catch (\Exception $e) {

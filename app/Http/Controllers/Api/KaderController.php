@@ -18,7 +18,12 @@ class KaderController extends Controller
      */
     public function index()
     {
-        return Kader::with(['user', 'posyandu'])->latest()->get();
+        return Kader::with([
+            'user', 
+            'posyandu', 
+            'ktpVillage.district.regency.province', 
+            'domisiliVillage.district.regency.province'
+        ])->latest()->get();
     }
 
     /**
@@ -26,37 +31,26 @@ class KaderController extends Controller
      */
     public function store(Request $request)
     {
+        // Validasi untuk semua field dari form lengkap
         $validatedData = $request->validate([
-            // Identitas Pribadi
             'nama_lengkap' => ['required', 'string', 'max:255'],
-            'posyandu_id' => ['required', 'exists:posyandus,id'],
-            'nik' => [
-                'required', 'string', 'size:16',
-                Rule::unique('kaders', 'nik'),
-                Rule::unique('ibus', 'nik'),
-                Rule::unique('anaks', 'nik'),
-            ],
-            'tanggal_lahir' => ['required', 'date'],
-            'jenis_kelamin' => ['required', 'string'],
-            'nomor_hp' => ['required', 'string', 'max:25'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'posyandu_id' => ['required', 'exists:posyandus,id'],
+            'nik' => ['required', 'string', 'size:16', Rule::unique('kaders', 'nik'), Rule::unique('ibus', 'nik'), Rule::unique('anaks', 'nik')],
+            'tanggal_lahir' => ['required', 'date'],
+            'jenis_kelamin' => ['required', 'string'],
+            'nomor_hp' => ['required', 'string', 'max:25', Rule::unique('kaders', 'nomor_hp')],
             'memiliki_jkn' => ['required', 'boolean'],
-
-            // Alamat KTP
             'ktp_village_id' => ['required', 'string', 'max:10'],
             'ktp_address' => ['required', 'string'],
             'ktp_rt' => ['required', 'string', 'max:3'],
             'ktp_rw' => ['required', 'string', 'max:3'],
-            
-            // Alamat Domisili
             'domisili_sesuai_ktp' => ['required', 'boolean'],
             'domisili_village_id' => ['exclude_if:domisili_sesuai_ktp,true', 'required', 'string', 'max:10'],
             'domisili_address' => ['exclude_if:domisili_sesuai_ktp,true', 'required', 'string'],
             'domisili_rt' => ['exclude_if:domisili_sesuai_ktp,true', 'required', 'string', 'max:3'],
             'domisili_rw' => ['exclude_if:domisili_sesuai_ktp,true', 'required', 'string', 'max:3'],
-            
-            // Kompetensi
             'pelatihan_posyandu' => ['required', 'boolean'],
             'pelatihan_ibu_hamil' => ['required', 'boolean'],
             'pelatihan_balita' => ['required', 'boolean'],
@@ -67,6 +61,8 @@ class KaderController extends Controller
 
         try {
             DB::beginTransaction();
+
+            // 1. Buat data untuk tabel 'users'
             $user = User::create([
                 'name' => $validatedData['nama_lengkap'],
                 'email' => $validatedData['email'],
@@ -74,12 +70,17 @@ class KaderController extends Controller
                 'role' => 'KADER',
             ]);
 
-            $kader = new Kader($validatedData);
-            $kader->user_id = $user->id;
+            // 2. Buat data untuk tabel 'kaders'
+            // Ambil semua data dari request KECUALI data untuk user
+            $kaderData = $request->except(['email', 'password', 'password_confirmation']);
+            
+            $kader = new Kader($kaderData);
+            $kader->user_id = $user->id; // Hubungkan dengan user yang baru dibuat
             $kader->save();
             
             DB::commit();
             return response()->json($kader->load('user', 'posyandu'), 201);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Gagal membuat data kader.', 'error' => $e->getMessage()], 500);
@@ -95,16 +96,11 @@ class KaderController extends Controller
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($kader->user_id)],
             'posyandu_id' => ['required', 'exists:posyandus,id'],
-            'nik' => [
-                'required', 'string', 'size:16',
-                Rule::unique('kaders', 'nik')->ignore($kader->id),
-                Rule::unique('ibus', 'nik'),
-                Rule::unique('anaks', 'nik'),
-            ],
+            'nik' => ['required', 'string', 'size:16', Rule::unique('kaders')->ignore($kader->id), Rule::unique('ibus', 'nik'), Rule::unique('anaks', 'nik')],
+            'nomor_hp' => ['required', 'string', 'max:25', Rule::unique('kaders', 'nomor_hp')->ignore($kader->id)],
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'tanggal_lahir' => ['required', 'date'],
             'jenis_kelamin' => ['required', 'string'],
-            'nomor_hp' => ['required', 'string', 'max:25'],
             'memiliki_jkn' => ['required', 'boolean'],
             'ktp_village_id' => ['required', 'string', 'max:10'],
             'ktp_address' => ['required', 'string'],
@@ -135,8 +131,8 @@ class KaderController extends Controller
                     $kader->user->update(['password' => Hash::make($request->password)]);
                 }
             }
-            // Update data kader
-            $kader->update($validatedData);
+            // Update data kader dengan data yang relevan saja
+            $kader->update($request->except(['email', 'password', 'password_confirmation']));
             
             DB::commit();
             return response()->json($kader->load('user', 'posyandu'));

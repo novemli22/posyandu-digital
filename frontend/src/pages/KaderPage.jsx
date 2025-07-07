@@ -3,6 +3,7 @@ import axios from "axios";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { PosyanduContext } from "../contexts/PosyanduContext";
 
+// State awal yang SANGAT LENGKAP untuk form Kader
 const initialFormState = {
     nama_lengkap: "",
     email: "",
@@ -31,6 +32,7 @@ const initialFormState = {
     tkk_balita: 0,
 };
 
+// Wilayah State awal
 const initialWilayahState = {
     ktp_prov: "",
     ktp_reg: "",
@@ -48,6 +50,7 @@ export default function KaderPage() {
     const [error, setError] = useState("");
     const [editingKader, setEditingKader] = useState(null);
 
+    // State untuk dropdown wilayah
     const [provinces, setProvinces] = useState([]);
     const [ktpRegencies, setKtpRegencies] = useState([]);
     const [ktpDistricts, setKtpDistricts] = useState([]);
@@ -61,6 +64,7 @@ export default function KaderPage() {
     const token = localStorage.getItem("auth_token");
     const API_CONFIG = { headers: { Authorization: `Bearer ${token}` } };
 
+    // --- FUNGSI FETCH DATA ---
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -84,6 +88,7 @@ export default function KaderPage() {
         fetchData();
     }, []);
 
+    // --- LOGIKA CASCADING DROPDOWN ---
     useEffect(() => {
         if (selectedWilayah.ktp_prov) {
             axios
@@ -145,6 +150,7 @@ export default function KaderPage() {
         }
     }, [selectedWilayah.dom_dist]);
 
+    // --- FUNGSI-FUNGSI HANDLER ---
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         const numericFields = [
@@ -174,17 +180,24 @@ export default function KaderPage() {
         const { name, value } = e.target;
         const wilName =
             type === "ktp" ? "ktp_village_id" : "domisili_village_id";
+        const prefix = type === "ktp" ? "ktp_" : "dom_";
         setSelectedWilayah((prev) => ({ ...prev, [name]: value }));
-        if (name.endsWith("_prov")) {
+        if (name.endsWith("prov")) {
             (type === "ktp" ? setKtpRegencies : setDomisiliRegencies)([]);
             (type === "ktp" ? setKtpDistricts : setDomisiliDistricts)([]);
             (type === "ktp" ? setKtpVillages : setDomisiliVillages)([]);
+            setSelectedWilayah((prev) => ({
+                ...prev,
+                [prefix + "reg"]: "",
+                [prefix + "dist"]: "",
+            }));
         }
-        if (name.endsWith("_reg")) {
+        if (name.endsWith("reg")) {
             (type === "ktp" ? setKtpDistricts : setDomisiliDistricts)([]);
             (type === "ktp" ? setKtpVillages : setDomisiliVillages)([]);
+            setSelectedWilayah((prev) => ({ ...prev, [prefix + "dist"]: "" }));
         }
-        if (name.endsWith("_dist")) {
+        if (name.endsWith("dist")) {
             (type === "ktp" ? setKtpVillages : setDomisiliVillages)([]);
         }
         setFormData((prev) => ({ ...prev, [wilName]: "" }));
@@ -206,11 +219,30 @@ export default function KaderPage() {
 
     const openEditModal = (kader) => {
         setEditingKader(kader);
-        setFormData({ ...initialFormState, ...kader });
-        if (kader.ktp_village?.district?.regency?.province_id) {
+        setFormData({
+            ...initialFormState,
+            ...kader,
+            email: kader.user.email,
+            password: "",
+            password_confirmation: "",
+        });
+
+        if (kader.ktp_village?.district?.regency?.province) {
+            const ktp = kader.ktp_village.district.regency;
             setSelectedWilayah((prev) => ({
                 ...prev,
-                ktp_prov: kader.ktp_village.district.regency.province_id,
+                ktp_prov: ktp.province.id,
+                ktp_reg: ktp.id,
+                ktp_dist: kader.ktp_village.district.id,
+            }));
+        }
+        if (kader.domisili_village?.district?.regency?.province) {
+            const dom = kader.domisili_village.district.regency;
+            setSelectedWilayah((prev) => ({
+                ...prev,
+                dom_prov: dom.province.id,
+                dom_reg: dom.id,
+                dom_dist: kader.domisili_village.district.id,
             }));
         }
         setError("");
@@ -500,6 +532,7 @@ export default function KaderPage() {
                                         <input
                                             type="password"
                                             name="password"
+                                            value={formData.password}
                                             onChange={handleInputChange}
                                             placeholder={
                                                 editingKader
@@ -517,11 +550,14 @@ export default function KaderPage() {
                                         <input
                                             type="password"
                                             name="password_confirmation"
+                                            value={
+                                                formData.password_confirmation
+                                            }
                                             onChange={handleInputChange}
                                             className="mt-1 w-full rounded"
                                             required={
                                                 !editingKader &&
-                                                formData.password
+                                                !!formData.password
                                             }
                                         />
                                     </div>
