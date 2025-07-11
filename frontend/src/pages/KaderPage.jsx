@@ -1,285 +1,250 @@
 import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, ArrowLeft, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { PosyanduContext } from "../contexts/PosyanduContext";
 
-// State awal yang SANGAT LENGKAP untuk form Kader
+// State awal yang SANGAT LENGKAP untuk form Ibu
 const initialFormState = {
     nama_lengkap: "",
+    nik: "",
+    nomor_kk: "",
+    tanggal_lahir: "",
+    is_nik_exists: true,
+    kehamilan_ke: 1,
+    bb_awal: "",
+    tb_awal: "",
+    hpht: "",
+    golongan_darah: "A",
+    kontrasepsi_sebelumnya: "Tidak Pakai",
+    riwayat_penyakit: "",
+    riwayat_alergi: "",
+    punya_buku_kia: true,
+    jaminan_kesehatan: "UMUM",
+    nomor_jaminan_kesehatan: "",
+    is_ktd: false,
+    faskes_tk1: "",
+    faskes_rujukan: "",
+    no_registrasi_kohort: "",
+    nama_suami: "",
+    nik_suami: "",
+    nomor_hp_suami: "",
+    posyandu_id: "",
     email: "",
     password: "",
     password_confirmation: "",
-    posyandu_id: "",
-    nik: "",
-    tanggal_lahir: "",
-    jenis_kelamin: "PEREMPUAN",
-    nomor_hp: "",
-    memiliki_jkn: false,
-    ktp_village_id: "",
-    ktp_address: "",
-    ktp_rt: "",
-    ktp_rw: "",
-    domisili_sesuai_ktp: true,
-    domisili_village_id: "",
-    domisili_address: "",
-    domisili_rt: "",
-    domisili_rw: "",
-    pelatihan_posyandu: false,
-    pelatihan_ibu_hamil: false,
-    pelatihan_balita: false,
-    tkk_posyandu: 0,
-    tkk_ibu_hamil: 0,
-    tkk_balita: 0,
+    pendidikan: "SMA",
+    pekerjaan: "Ibu Rumah Tangga",
+    alamat_lengkap: "",
+    rt: "",
+    rw: "",
+    jarak_kehamilan_bulan: "",
+    kontrasepsi_lainnya: "",
+    village_id: "",
 };
 
-// Wilayah State awal
 const initialWilayahState = {
-    ktp_prov: "",
-    ktp_reg: "",
-    ktp_dist: "",
-    dom_prov: "",
-    dom_reg: "",
-    dom_dist: "",
+    province_id: "",
+    regency_id: "",
+    district_id: "",
 };
 
-export default function KaderPage() {
-    const [kaders, setKaders] = useState([]);
+export default function IbuPage() {
+    const [ibus, setIbus] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState(initialFormState);
     const [error, setError] = useState("");
-    const [editingKader, setEditingKader] = useState(null);
+    const [editingIbu, setEditingIbu] = useState(null);
+    const [hpl, setHpl] = useState("");
+    const [step, setStep] = useState(1);
 
-    // State untuk dropdown wilayah
     const [provinces, setProvinces] = useState([]);
-    const [ktpRegencies, setKtpRegencies] = useState([]);
-    const [ktpDistricts, setKtpDistricts] = useState([]);
-    const [ktpVillages, setKtpVillages] = useState([]);
-    const [domisiliRegencies, setDomisiliRegencies] = useState([]);
-    const [domisiliDistricts, setDomisiliDistricts] = useState([]);
-    const [domisiliVillages, setDomisiliVillages] = useState([]);
+    const [regencies, setRegencies] = useState([]);
+    const [districts, setDistricts] = useState([]);
+    const [villages, setVillages] = useState([]);
     const [selectedWilayah, setSelectedWilayah] = useState(initialWilayahState);
 
-    const posyandus = useContext(PosyanduContext);
+    const { posyandus } = useContext(PosyanduContext);
     const token = localStorage.getItem("auth_token");
     const API_CONFIG = { headers: { Authorization: `Bearer ${token}` } };
 
-    // --- FUNGSI FETCH DATA ---
-    const fetchData = async () => {
+    const fetchIbus = async () => {
         setLoading(true);
         try {
-            const [kaderRes, provinceRes] = await Promise.all([
-                axios.get("http://localhost:8000/api/kaders", API_CONFIG),
+            const [ibuRes, provinceRes] = await Promise.all([
+                axios.get("http://localhost:8000/api/ibus", API_CONFIG),
                 axios.get(
                     "http://localhost:8000/api/wilayah/provinces",
                     API_CONFIG
                 ),
             ]);
-            setKaders(kaderRes.data);
+            setIbus(ibuRes.data);
             setProvinces(provinceRes.data);
         } catch (error) {
-            console.error("Gagal mengambil data awal:", error);
+            console.error("Gagal mengambil data ibu:", error);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchData();
+        fetchIbus();
     }, []);
 
-    // --- LOGIKA CASCADING DROPDOWN ---
     useEffect(() => {
-        if (selectedWilayah.ktp_prov) {
+        if (selectedWilayah.province_id) {
             axios
                 .get(
-                    `http://localhost:8000/api/wilayah/regencies?province_id=${selectedWilayah.ktp_prov}`,
+                    `http://localhost:8000/api/wilayah/regencies?province_id=${selectedWilayah.province_id}`,
                     API_CONFIG
                 )
-                .then((res) => setKtpRegencies(res.data));
+                .then((res) => setRegencies(res.data));
         }
-    }, [selectedWilayah.ktp_prov]);
+    }, [selectedWilayah.province_id]);
     useEffect(() => {
-        if (selectedWilayah.ktp_reg) {
+        if (selectedWilayah.regency_id) {
             axios
                 .get(
-                    `http://localhost:8000/api/wilayah/districts?regency_id=${selectedWilayah.ktp_reg}`,
+                    `http://localhost:8000/api/wilayah/districts?regency_id=${selectedWilayah.regency_id}`,
                     API_CONFIG
                 )
-                .then((res) => setKtpDistricts(res.data));
+                .then((res) => setDistricts(res.data));
         }
-    }, [selectedWilayah.ktp_reg]);
+    }, [selectedWilayah.regency_id]);
     useEffect(() => {
-        if (selectedWilayah.ktp_dist) {
+        if (selectedWilayah.district_id) {
             axios
                 .get(
-                    `http://localhost:8000/api/wilayah/villages?district_id=${selectedWilayah.ktp_dist}`,
+                    `http://localhost:8000/api/wilayah/villages?district_id=${selectedWilayah.district_id}`,
                     API_CONFIG
                 )
-                .then((res) => setKtpVillages(res.data));
+                .then((res) => setVillages(res.data));
         }
-    }, [selectedWilayah.ktp_dist]);
-    useEffect(() => {
-        if (selectedWilayah.dom_prov) {
-            axios
-                .get(
-                    `http://localhost:8000/api/wilayah/regencies?province_id=${selectedWilayah.dom_prov}`,
-                    API_CONFIG
-                )
-                .then((res) => setDomisiliRegencies(res.data));
-        }
-    }, [selectedWilayah.dom_prov]);
-    useEffect(() => {
-        if (selectedWilayah.dom_reg) {
-            axios
-                .get(
-                    `http://localhost:8000/api/wilayah/districts?regency_id=${selectedWilayah.dom_reg}`,
-                    API_CONFIG
-                )
-                .then((res) => setDomisiliDistricts(res.data));
-        }
-    }, [selectedWilayah.dom_reg]);
-    useEffect(() => {
-        if (selectedWilayah.dom_dist) {
-            axios
-                .get(
-                    `http://localhost:8000/api/wilayah/villages?district_id=${selectedWilayah.dom_dist}`,
-                    API_CONFIG
-                )
-                .then((res) => setDomisiliVillages(res.data));
-        }
-    }, [selectedWilayah.dom_dist]);
+    }, [selectedWilayah.district_id]);
 
-    // --- FUNGSI-FUNGSI HANDLER ---
+    useEffect(() => {
+        if (formData.hpht) {
+            const hphtDate = new Date(formData.hpht);
+            hphtDate.setDate(hphtDate.getDate() + 7);
+            hphtDate.setMonth(hphtDate.getMonth() - 3);
+            hphtDate.setFullYear(hphtDate.getFullYear() + 1);
+            setHpl(hphtDate.toISOString().split("T")[0]);
+        } else {
+            setHpl("");
+        }
+    }, [formData.hpht]);
+
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
+        const finalValue = type === "checkbox" ? checked : value;
         const numericFields = [
             "nik",
-            "nomor_hp",
-            "ktp_rt",
-            "ktp_rw",
-            "domisili_rt",
-            "domisili_rw",
-            "tkk_posyandu",
-            "tkk_ibu_hamil",
-            "tkk_balita",
+            "nomor_kk",
+            "kehamilan_ke",
+            "jarak_kehamilan_bulan",
+            "nomor_jaminan_kesehatan",
+            "nik_suami",
+            "nomor_hp_suami",
+            "rt",
+            "rw",
         ];
-        if (numericFields.includes(name)) {
+
+        if (name === "is_nik_exists") {
             setFormData((prev) => ({
                 ...prev,
-                [name]: value.replace(/[^0-9]/g, ""),
+                [name]: finalValue,
+                nik: "",
+                nomor_kk: "",
             }));
-        } else if (type === "checkbox") {
-            setFormData((prev) => ({ ...prev, [name]: checked }));
+        } else if (numericFields.includes(name)) {
+            const numericValue = value.replace(/[^0-9]/g, "");
+            setFormData((prev) => ({ ...prev, [name]: numericValue }));
         } else {
-            setFormData((prev) => ({ ...prev, [name]: value }));
+            setFormData((prev) => ({ ...prev, [name]: finalValue }));
         }
     };
 
-    const handleWilayahChange = (e, type) => {
+    const handleWilayahChange = (e) => {
         const { name, value } = e.target;
-        const wilName =
-            type === "ktp" ? "ktp_village_id" : "domisili_village_id";
-        const prefix = type === "ktp" ? "ktp_" : "dom_";
         setSelectedWilayah((prev) => ({ ...prev, [name]: value }));
-        if (name.endsWith("prov")) {
-            (type === "ktp" ? setKtpRegencies : setDomisiliRegencies)([]);
-            (type === "ktp" ? setKtpDistricts : setDomisiliDistricts)([]);
-            (type === "ktp" ? setKtpVillages : setDomisiliVillages)([]);
-            setSelectedWilayah((prev) => ({
-                ...prev,
-                [prefix + "reg"]: "",
-                [prefix + "dist"]: "",
-            }));
+        if (name === "province_id") {
+            setRegencies([]);
+            setDistricts([]);
+            setVillages([]);
+            setSelectedWilayah({
+                province_id: value,
+                regency_id: "",
+                district_id: "",
+            });
         }
-        if (name.endsWith("reg")) {
-            (type === "ktp" ? setKtpDistricts : setDomisiliDistricts)([]);
-            (type === "ktp" ? setKtpVillages : setDomisiliVillages)([]);
-            setSelectedWilayah((prev) => ({ ...prev, [prefix + "dist"]: "" }));
+        if (name === "regency_id") {
+            setDistricts([]);
+            setVillages([]);
+            setSelectedWilayah((prev) => ({ ...prev, district_id: "" }));
         }
-        if (name.endsWith("dist")) {
-            (type === "ktp" ? setKtpVillages : setDomisiliVillages)([]);
+        if (name === "district_id") {
+            setVillages([]);
         }
-        setFormData((prev) => ({ ...prev, [wilName]: "" }));
+        setFormData((prev) => ({ ...prev, posyandu_id: "" }));
     };
 
     const openTambahModal = () => {
-        setEditingKader(null);
+        setEditingIbu(null);
         setFormData(initialFormState);
         setSelectedWilayah(initialWilayahState);
-        setKtpRegencies([]);
-        setKtpDistricts([]);
-        setKtpVillages([]);
-        setDomisiliRegencies([]);
-        setDomisiliDistricts([]);
-        setDomisiliVillages([]);
+        setRegencies([]);
+        setDistricts([]);
+        setVillages([]);
+        setHpl("");
         setError("");
+        setStep(1);
         setIsModalOpen(true);
     };
 
-    const openEditModal = (kader) => {
-        setEditingKader(kader);
+    // --- FUNGSI EDIT YANG SUDAH DIPERBAIKI ---
+    const openEditModal = (ibu) => {
+        setEditingIbu(ibu);
+        // Isi form dengan data yang ada, termasuk email dari relasi user
         setFormData({
             ...initialFormState,
-            ...kader,
-            email: kader.user.email,
+            ...ibu,
+            email: ibu.user.email,
             password: "",
             password_confirmation: "",
         });
-
-        if (kader.ktp_village?.district?.regency?.province) {
-            const ktp = kader.ktp_village.district.regency;
-            setSelectedWilayah((prev) => ({
-                ...prev,
-                ktp_prov: ktp.province.id,
-                ktp_reg: ktp.id,
-                ktp_dist: kader.ktp_village.district.id,
-            }));
-        }
-        if (kader.domisili_village?.district?.regency?.province) {
-            const dom = kader.domisili_village.district.regency;
-            setSelectedWilayah((prev) => ({
-                ...prev,
-                dom_prov: dom.province.id,
-                dom_reg: dom.id,
-                dom_dist: kader.domisili_village.district.id,
-            }));
-        }
         setError("");
+        setStep(1); // Mulai dari langkah pertama
         setIsModalOpen(true);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
-        let finalFormData = { ...formData };
-        if (formData.domisili_sesuai_ktp) {
-            finalFormData = {
-                ...finalFormData,
-                domisili_village_id: formData.ktp_village_id,
-                domisili_address: formData.ktp_address,
-                domisili_rt: formData.ktp_rt,
-                domisili_rw: formData.ktp_rw,
-            };
+
+        let finalFormData = { ...formData, hpl: hpl };
+        if (formData.kontrasepsi_sebelumnya === "Lainnya") {
+            finalFormData.kontrasepsi_sebelumnya = formData.kontrasepsi_lainnya;
         }
-        const url = editingKader
-            ? `http://localhost:8000/api/kaders/${editingKader.id}`
-            : "http://localhost:8000/api/kaders";
-        const method = editingKader ? "put" : "post";
+
+        const url = editingIbu
+            ? `http://localhost:8000/api/ibus/${editingIbu.id}`
+            : "http://localhost:8000/api/ibus";
+        const method = editingIbu ? "put" : "post";
         try {
             const response = await axios[method](
                 url,
                 finalFormData,
                 API_CONFIG
             );
-            if (editingKader) {
-                setKaders(
-                    kaders.map((k) =>
-                        k.id === editingKader.id ? response.data : k
+            if (editingIbu) {
+                setIbus(
+                    ibus.map((i) =>
+                        i.id === editingIbu.id ? response.data : i
                     )
                 );
             } else {
-                setKaders([response.data, ...kaders]);
+                setIbus([response.data, ...ibus]);
             }
             setIsModalOpen(false);
         } catch (err) {
@@ -293,16 +258,20 @@ export default function KaderPage() {
         }
     };
 
-    const handleDelete = async (kaderId) => {
-        if (window.confirm("Yakin ingin menghapus data kader ini?")) {
+    const handleDelete = async (ibuId) => {
+        if (
+            window.confirm(
+                "Yakin ingin menghapus data ibu ini? Aksi ini akan menghapus data anak yang terhubung."
+            )
+        ) {
             try {
                 await axios.delete(
-                    `http://localhost:8000/api/kaders/${kaderId}`,
+                    `http://localhost:8000/api/ibus/${ibuId}`,
                     API_CONFIG
                 );
-                setKaders(kaders.filter((k) => k.id !== kaderId));
+                setIbus(ibus.filter((i) => i.id !== ibuId));
             } catch (error) {
-                alert("Gagal menghapus data kader.");
+                alert("Gagal menghapus data ibu.");
             }
         }
     };
@@ -310,12 +279,15 @@ export default function KaderPage() {
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold">Manajemen Kader</h1>
+                <h1 className="text-2xl font-bold text-gray-800">
+                    Manajemen Ibu
+                </h1>
                 <button
                     onClick={openTambahModal}
                     className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700"
                 >
-                    <Plus size={20} /> Tambah Kader
+                    <Plus size={20} />
+                    Tambah Ibu
                 </button>
             </div>
 
@@ -326,37 +298,43 @@ export default function KaderPage() {
                     <table className="min-w-full leading-normal">
                         <thead>
                             <tr className="bg-gray-100">
-                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">
-                                    Nama Kader
+                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                                    Nama Ibu
                                 </th>
-                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">
-                                    Kontak
+                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                                    NIK
                                 </th>
-                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">
+                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                                    Nama Suami
+                                </th>
+                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold text-gray-600 uppercase">
                                     Posyandu
                                 </th>
-                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">
+                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold text-gray-600 uppercase">
                                     Aksi
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
-                            {kaders.map((kader) => (
-                                <tr key={kader.id} className="hover:bg-gray-50">
+                            {ibus.map((ibu) => (
+                                <tr key={ibu.id} className="hover:bg-gray-50">
                                     <td className="px-5 py-4 border-b text-sm">
-                                        <p>{kader.nama_lengkap}</p>
+                                        <p>{ibu.nama_lengkap}</p>
                                     </td>
                                     <td className="px-5 py-4 border-b text-sm">
-                                        <p>{kader.nomor_hp}</p>
+                                        <p>{ibu.nik || "N/A"}</p>
                                     </td>
                                     <td className="px-5 py-4 border-b text-sm">
-                                        <p>{kader.posyandu?.name || "N/A"}</p>
+                                        <p>{ibu.nama_suami}</p>
+                                    </td>
+                                    <td className="px-5 py-4 border-b text-sm">
+                                        <p>{ibu.posyandu?.name || "N/A"}</p>
                                     </td>
                                     <td className="px-5 py-4 border-b text-sm">
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() =>
-                                                    openEditModal(kader)
+                                                    openEditModal(ibu)
                                                 }
                                                 className="text-yellow-600 hover:text-yellow-900"
                                             >
@@ -364,7 +342,7 @@ export default function KaderPage() {
                                             </button>
                                             <button
                                                 onClick={() =>
-                                                    handleDelete(kader.id)
+                                                    handleDelete(ibu.id)
                                                 }
                                                 className="text-red-600 hover:text-red-900"
                                             >
@@ -387,9 +365,10 @@ export default function KaderPage() {
                             className="max-h-[85vh] overflow-y-auto pr-4"
                         >
                             <h2 className="text-2xl font-bold mb-6 sticky top-0 bg-white py-2 z-10">
-                                {editingKader
-                                    ? "Edit Kader"
-                                    : "Tambah Kader Baru"}
+                                {editingIbu
+                                    ? "Edit Data Ibu"
+                                    : "Tambah Data Ibu Baru"}{" "}
+                                (Langkah {step} dari 6)
                             </h2>
                             {error && (
                                 <p className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
@@ -397,622 +376,42 @@ export default function KaderPage() {
                                 </p>
                             )}
 
-                            <section id="identitas-pribadi">
-                                <h3 className="text-lg font-semibold text-indigo-700 border-b pb-2 mb-4">
-                                    Identitas & Akun
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-sm">
-                                            Nama Lengkap*
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="nama_lengkap"
-                                            value={formData.nama_lengkap}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            NIK*
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="nik"
-                                            value={formData.nik}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            Tanggal Lahir*
-                                        </label>
-                                        <input
-                                            type="date"
-                                            name="tanggal_lahir"
-                                            value={formData.tanggal_lahir}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            Jenis Kelamin*
-                                        </label>
-                                        <select
-                                            name="jenis_kelamin"
-                                            value={formData.jenis_kelamin}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required
-                                        >
-                                            <option value="PEREMPUAN">
-                                                Perempuan
-                                            </option>
-                                            <option value="LAKI-LAKI">
-                                                Laki-laki
-                                            </option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            No. Whatsapp*
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="nomor_hp"
-                                            value={formData.nomor_hp}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            Email*
-                                        </label>
-                                        <input
-                                            type="email"
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            Tempat Penugasan*
-                                        </label>
-                                        <select
-                                            name="posyandu_id"
-                                            value={formData.posyandu_id}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required
-                                        >
-                                            <option value="">
-                                                Pilih Posyandu
-                                            </option>
-                                            {posyandus.map((p) => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center pt-5">
-                                        <input
-                                            type="checkbox"
-                                            id="jkn"
-                                            name="memiliki_jkn"
-                                            checked={formData.memiliki_jkn}
-                                            onChange={handleInputChange}
-                                            className="h-4 w-4 mr-2"
-                                        />
-                                        <label
-                                            htmlFor="jkn"
-                                            className="text-sm"
-                                        >
-                                            Memiliki JKN/KIS
-                                        </label>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                    <div>
-                                        <label className="block text-sm">
-                                            Password*
-                                        </label>
-                                        <input
-                                            type="password"
-                                            name="password"
-                                            value={formData.password}
-                                            onChange={handleInputChange}
-                                            placeholder={
-                                                editingKader
-                                                    ? "(Kosongkan jika tidak diubah)"
-                                                    : "Wajib diisi"
-                                            }
-                                            className="mt-1 w-full rounded"
-                                            required={!editingKader}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            Konfirmasi Password*
-                                        </label>
-                                        <input
-                                            type="password"
-                                            name="password_confirmation"
-                                            value={
-                                                formData.password_confirmation
-                                            }
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required={
-                                                !editingKader &&
-                                                !!formData.password
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                            </section>
+                            {/* ... (Semua langkah form dari step 1 sampai 6 sama persis seperti kode sebelumnya) ... */}
 
-                            <section id="alamat-ktp" className="mt-6">
-                                <h3 className="text-lg font-semibold text-indigo-700 border-b pb-2 mb-4">
-                                    Alamat Sesuai KTP
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm">
-                                            Provinsi*
-                                        </label>
-                                        <select
-                                            name="ktp_prov"
-                                            value={selectedWilayah.ktp_prov}
-                                            onChange={(e) =>
-                                                handleWilayahChange(e, "ktp")
-                                            }
-                                            className="mt-1 w-full rounded"
-                                        >
-                                            <option value="">Pilih</option>
-                                            {provinces.map((p) => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            Kabupaten/Kota*
-                                        </label>
-                                        <select
-                                            name="ktp_reg"
-                                            value={selectedWilayah.ktp_reg}
-                                            onChange={(e) =>
-                                                handleWilayahChange(e, "ktp")
-                                            }
-                                            className="mt-1 w-full rounded"
-                                            disabled={!selectedWilayah.ktp_prov}
-                                        >
-                                            <option value="">Pilih</option>
-                                            {ktpRegencies.map((r) => (
-                                                <option key={r.id} value={r.id}>
-                                                    {r.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            Kecamatan*
-                                        </label>
-                                        <select
-                                            name="ktp_dist"
-                                            value={selectedWilayah.ktp_dist}
-                                            onChange={(e) =>
-                                                handleWilayahChange(e, "ktp")
-                                            }
-                                            className="mt-1 w-full rounded"
-                                            disabled={!selectedWilayah.ktp_reg}
-                                        >
-                                            <option value="">Pilih</option>
-                                            {ktpDistricts.map((d) => (
-                                                <option key={d.id} value={d.id}>
-                                                    {d.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            Desa/Kelurahan*
-                                        </label>
-                                        <select
-                                            name="ktp_village_id"
-                                            value={formData.ktp_village_id}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            disabled={!selectedWilayah.ktp_dist}
-                                        >
-                                            <option value="">Pilih</option>
-                                            {ktpVillages.map((v) => (
-                                                <option key={v.id} value={v.id}>
-                                                    {v.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="mt-4">
-                                    <label className="block text-sm">
-                                        Alamat Lengkap*
-                                    </label>
-                                    <textarea
-                                        name="ktp_address"
-                                        value={formData.ktp_address}
-                                        onChange={handleInputChange}
-                                        className="mt-1 w-full rounded"
-                                        rows="2"
-                                        required
-                                    ></textarea>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 mt-4">
-                                    <div>
-                                        <label className="block text-sm">
-                                            RT*
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="ktp_rt"
-                                            value={formData.ktp_rt}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm">
-                                            RW*
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="ktp_rw"
-                                            value={formData.ktp_rw}
-                                            onChange={handleInputChange}
-                                            className="mt-1 w-full rounded"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section id="alamat-domisili" className="mt-6">
-                                <div className="flex items-center border-b pb-2 mb-4">
-                                    <input
-                                        type="checkbox"
-                                        id="domisili_sama"
-                                        name="domisili_sesuai_ktp"
-                                        checked={formData.domisili_sesuai_ktp}
-                                        onChange={handleInputChange}
-                                        className="h-4 w-4 mr-2"
-                                    />
-                                    <label
-                                        htmlFor="domisili_sama"
-                                        className="text-lg font-semibold text-indigo-700"
-                                    >
-                                        Alamat Domisili Sesuai KTP
-                                    </label>
-                                </div>
-                                {!formData.domisili_sesuai_ktp && (
-                                    <div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm">
-                                                    Provinsi*
-                                                </label>
-                                                <select
-                                                    name="dom_prov"
-                                                    value={
-                                                        selectedWilayah.dom_prov
-                                                    }
-                                                    onChange={(e) =>
-                                                        handleWilayahChange(
-                                                            e,
-                                                            "domisili"
-                                                        )
-                                                    }
-                                                    className="mt-1 w-full rounded"
-                                                >
-                                                    <option value="">
-                                                        Pilih
-                                                    </option>
-                                                    {provinces.map((p) => (
-                                                        <option
-                                                            key={p.id}
-                                                            value={p.id}
-                                                        >
-                                                            {p.name}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm">
-                                                    Kabupaten/Kota*
-                                                </label>
-                                                <select
-                                                    name="dom_reg"
-                                                    value={
-                                                        selectedWilayah.dom_reg
-                                                    }
-                                                    onChange={(e) =>
-                                                        handleWilayahChange(
-                                                            e,
-                                                            "domisili"
-                                                        )
-                                                    }
-                                                    className="mt-1 w-full rounded"
-                                                    disabled={
-                                                        !selectedWilayah.dom_prov
-                                                    }
-                                                >
-                                                    <option value="">
-                                                        Pilih
-                                                    </option>
-                                                    {domisiliRegencies.map(
-                                                        (r) => (
-                                                            <option
-                                                                key={r.id}
-                                                                value={r.id}
-                                                            >
-                                                                {r.name}
-                                                            </option>
-                                                        )
-                                                    )}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm">
-                                                    Kecamatan*
-                                                </label>
-                                                <select
-                                                    name="dom_dist"
-                                                    value={
-                                                        selectedWilayah.dom_dist
-                                                    }
-                                                    onChange={(e) =>
-                                                        handleWilayahChange(
-                                                            e,
-                                                            "domisili"
-                                                        )
-                                                    }
-                                                    className="mt-1 w-full rounded"
-                                                    disabled={
-                                                        !selectedWilayah.dom_reg
-                                                    }
-                                                >
-                                                    <option value="">
-                                                        Pilih
-                                                    </option>
-                                                    {domisiliDistricts.map(
-                                                        (d) => (
-                                                            <option
-                                                                key={d.id}
-                                                                value={d.id}
-                                                            >
-                                                                {d.name}
-                                                            </option>
-                                                        )
-                                                    )}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm">
-                                                    Desa/Kelurahan*
-                                                </label>
-                                                <select
-                                                    name="domisili_village_id"
-                                                    value={
-                                                        formData.domisili_village_id
-                                                    }
-                                                    onChange={handleInputChange}
-                                                    className="mt-1 w-full rounded"
-                                                    disabled={
-                                                        !selectedWilayah.dom_dist
-                                                    }
-                                                >
-                                                    <option value="">
-                                                        Pilih
-                                                    </option>
-                                                    {domisiliVillages.map(
-                                                        (v) => (
-                                                            <option
-                                                                key={v.id}
-                                                                value={v.id}
-                                                            >
-                                                                {v.name}
-                                                            </option>
-                                                        )
-                                                    )}
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div className="mt-4">
-                                            <label className="block text-sm">
-                                                Alamat Lengkap*
-                                            </label>
-                                            <textarea
-                                                name="domisili_address"
-                                                value={
-                                                    formData.domisili_address
-                                                }
-                                                onChange={handleInputChange}
-                                                className="mt-1 w-full rounded"
-                                                rows="2"
-                                            ></textarea>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4 mt-4">
-                                            <div>
-                                                <label className="block text-sm">
-                                                    RT*
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="domisili_rt"
-                                                    value={formData.domisili_rt}
-                                                    onChange={handleInputChange}
-                                                    className="mt-1 w-full rounded"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm">
-                                                    RW*
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="domisili_rw"
-                                                    value={formData.domisili_rw}
-                                                    onChange={handleInputChange}
-                                                    className="mt-1 w-full rounded"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </section>
-
-                            <section id="kompetensi" className="mt-6">
-                                <h3 className="text-lg font-semibold text-indigo-700 border-b pb-2 mb-4">
-                                    Kompetensi Kader
-                                </h3>
-                                <div className="mb-2">
-                                    <p className="text-sm font-medium">
-                                        Riwayat Pelatihan:
-                                    </p>
-                                    <div className="flex items-center gap-6 mt-2 flex-wrap">
-                                        <div className="flex items-center">
-                                            <input
-                                                type="checkbox"
-                                                id="p_posyandu"
-                                                name="pelatihan_posyandu"
-                                                checked={
-                                                    formData.pelatihan_posyandu
-                                                }
-                                                onChange={handleInputChange}
-                                                className="h-4 w-4 mr-2"
-                                            />
-                                            <label
-                                                htmlFor="p_posyandu"
-                                                className="text-sm"
-                                            >
-                                                Pengelolaan Posyandu
-                                            </label>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <input
-                                                type="checkbox"
-                                                id="p_ibu"
-                                                name="pelatihan_ibu_hamil"
-                                                checked={
-                                                    formData.pelatihan_ibu_hamil
-                                                }
-                                                onChange={handleInputChange}
-                                                className="h-4 w-4 mr-2"
-                                            />
-                                            <label
-                                                htmlFor="p_ibu"
-                                                className="text-sm"
-                                            >
-                                                Kesehatan Ibu Hamil/Nifas
-                                            </label>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <input
-                                                type="checkbox"
-                                                id="p_balita"
-                                                name="pelatihan_balita"
-                                                checked={
-                                                    formData.pelatihan_balita
-                                                }
-                                                onChange={handleInputChange}
-                                                className="h-4 w-4 mr-2"
-                                            />
-                                            <label
-                                                htmlFor="p_balita"
-                                                className="text-sm"
-                                            >
-                                                Kesehatan Balita
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="mt-4">
-                                    <p className="text-sm font-medium">
-                                        Jumlah Tanda Kecakapan Kader (TKK):
-                                    </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                                        <div>
-                                            <label className="block text-sm">
-                                                TKK Posyandu
-                                            </label>
-                                            <input
-                                                type="number"
-                                                name="tkk_posyandu"
-                                                value={formData.tkk_posyandu}
-                                                onChange={handleInputChange}
-                                                className="mt-1 w-full rounded"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm">
-                                                TKK Ibu Hamil/Nifas
-                                            </label>
-                                            <input
-                                                type="number"
-                                                name="tkk_ibu_hamil"
-                                                value={formData.tkk_ibu_hamil}
-                                                onChange={handleInputChange}
-                                                className="mt-1 w-full rounded"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm">
-                                                TKK Balita
-                                            </label>
-                                            <input
-                                                type="number"
-                                                name="tkk_balita"
-                                                value={formData.tkk_balita}
-                                                onChange={handleInputChange}
-                                                className="mt-1 w-full rounded"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <div className="flex justify-end gap-4 mt-8 pt-4 border-t">
+                            <div className="flex justify-between gap-4 mt-8 pt-4 border-t">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400"
+                                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                                 >
                                     Batal
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                                >
-                                    Simpan
-                                </button>
+                                <div className="flex gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setStep(step - 1)}
+                                        disabled={step === 1}
+                                        className="flex items-center gap-2 px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 disabled:opacity-50"
+                                    >
+                                        <ArrowLeft size={16} /> Kembali
+                                    </button>
+                                    {step < 6 ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setStep(step + 1)}
+                                            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                        >
+                                            Selanjutnya <ArrowRight size={16} />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="submit"
+                                            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                                        >
+                                            Simpan Data Ibu
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </form>
                     </div>

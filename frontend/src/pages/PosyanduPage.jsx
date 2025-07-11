@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import { Plus, Edit, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { PosyanduContext } from "../contexts/PosyanduContext"; // 1. Impor Context
 
+// State awal yang bersih untuk form
 const initialFormState = {
     name: "",
     address: "",
     rt: "",
     rw: "",
     village_id: "",
+    puskesmas_pembina: "",
 };
 const initialWilayahState = {
     province_id: "",
@@ -16,13 +20,16 @@ const initialWilayahState = {
 };
 
 export default function PosyanduPage() {
-    const [posyandus, setPosyandus] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // 2. Ambil data dan fungsi refresh dari Context
+    const { posyandus, refreshPosyandus } = useContext(PosyanduContext);
+
+    const [loading, setLoading] = useState(false); // Loading sekarang hanya untuk aksi, bukan fetch awal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState(initialFormState);
     const [error, setError] = useState("");
     const [editingPosyandu, setEditingPosyandu] = useState(null);
 
+    // State untuk dropdown wilayah
     const [provinces, setProvinces] = useState([]);
     const [regencies, setRegencies] = useState([]);
     const [districts, setDistricts] = useState([]);
@@ -32,29 +39,17 @@ export default function PosyanduPage() {
     const token = localStorage.getItem("auth_token");
     const API_CONFIG = { headers: { Authorization: `Bearer ${token}` } };
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [posyanduRes, provinceRes] = await Promise.all([
-                axios.get("http://localhost:8000/api/posyandus", API_CONFIG),
-                axios.get(
-                    "http://localhost:8000/api/wilayah/provinces",
-                    API_CONFIG
-                ),
-            ]);
-            setPosyandus(posyanduRes.data);
-            setProvinces(provinceRes.data);
-        } catch (error) {
-            console.error("Gagal mengambil data awal:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Ambil data provinsi sekali saja saat halaman dimuat
     useEffect(() => {
-        fetchData();
+        axios
+            .get("http://localhost:8000/api/wilayah/provinces", API_CONFIG)
+            .then((res) => setProvinces(res.data))
+            .catch((error) =>
+                console.error("Gagal mengambil data provinsi:", error)
+            );
     }, []);
 
+    // --- LOGIKA CASCADING DROPDOWN ---
     useEffect(() => {
         if (selectedWilayah.province_id) {
             axios
@@ -86,9 +81,10 @@ export default function PosyanduPage() {
         }
     }, [selectedWilayah.district_id]);
 
+    // --- FUNGSI-FUNGSI HANDLER ---
     const handleWilayahChange = (e) => {
         const { name, value } = e.target;
-        const newWilayah = { ...selectedWilayah, [name]: value };
+        setSelectedWilayah((prev) => ({ ...prev, [name]: value }));
         if (name === "province_id") {
             setRegencies([]);
             setDistricts([]);
@@ -107,12 +103,21 @@ export default function PosyanduPage() {
         if (name === "district_id") {
             setVillages([]);
         }
-        setSelectedWilayah(newWilayah);
         setFormData((prev) => ({ ...prev, village_id: "" }));
     };
 
-    const handleInputChange = (e) =>
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        const numericFields = ["rt", "rw"];
+        if (numericFields.includes(name)) {
+            setFormData((prev) => ({
+                ...prev,
+                [name]: value.replace(/[^0-9]/g, ""),
+            }));
+        } else {
+            setFormData((prev) => ({ ...prev, [name]: value }));
+        }
+    };
 
     const openTambahModal = () => {
         setEditingPosyandu(null);
@@ -125,7 +130,6 @@ export default function PosyanduPage() {
         setIsModalOpen(true);
     };
 
-    // --- FUNGSI EDIT YANG SUDAH DIPERBAIKI ---
     const openEditModal = (posyandu) => {
         setEditingPosyandu(posyandu);
         setFormData({
@@ -134,14 +138,13 @@ export default function PosyanduPage() {
             rt: posyandu.rt,
             rw: posyandu.rw,
             village_id: posyandu.village_id,
+            puskesmas_pembina: posyandu.puskesmas_pembina,
         });
 
-        // Ini bagian penting: atur semua dropdown wilayah
-        // dan biarkan useEffect yang mengurus pemanggilan API untuk mengisi opsinya
         if (posyandu.village?.district?.regency?.province) {
             const provId = posyandu.village.district.regency.province.id;
-            const regId = posyandu.village.district.id;
-            const distId = posyandu.village.id;
+            const regId = posyandu.village.district.regency.id;
+            const distId = posyandu.village.district.id;
 
             setSelectedWilayah({
                 province_id: provId,
@@ -149,7 +152,6 @@ export default function PosyanduPage() {
                 district_id: distId,
             });
         }
-
         setError("");
         setIsModalOpen(true);
     };
@@ -166,16 +168,8 @@ export default function PosyanduPage() {
             : "http://localhost:8000/api/posyandus";
         const method = editingPosyandu ? "put" : "post";
         try {
-            const response = await axios[method](url, formData, API_CONFIG);
-            if (editingPosyandu) {
-                setPosyandus(
-                    posyandus.map((p) =>
-                        p.id === editingPosyandu.id ? response.data : p
-                    )
-                );
-            } else {
-                setPosyandus([response.data, ...posyandus]);
-            }
+            await axios[method](url, formData, API_CONFIG);
+            refreshPosyandus(); // <-- 3. PANGGIL FUNGSI REFRESH
             setIsModalOpen(false);
         } catch (err) {
             if (err.response && err.response.status === 422) {
@@ -195,7 +189,7 @@ export default function PosyanduPage() {
                     `http://localhost:8000/api/posyandus/${posyanduId}`,
                     API_CONFIG
                 );
-                setPosyandus(posyandus.filter((p) => p.id !== posyanduId));
+                refreshPosyandus(); // <-- 3. PANGGIL FUNGSI REFRESH
             } catch (error) {
                 alert("Gagal menghapus data posyandu.");
             }
@@ -224,13 +218,10 @@ export default function PosyanduPage() {
                                     Nama Posyandu
                                 </th>
                                 <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">
-                                    Alamat
+                                    Puskesmas Pembina
                                 </th>
                                 <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">
-                                    Desa/Kelurahan
-                                </th>
-                                <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">
-                                    Kecamatan
+                                    Alamat Lengkap
                                 </th>
                                 <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">
                                     Aksi
@@ -244,19 +235,22 @@ export default function PosyanduPage() {
                                     className="hover:bg-gray-50"
                                 >
                                     <td className="px-5 py-4 border-b text-sm">
-                                        <p>{posyandu.name}</p>
+                                        <Link
+                                            to={`/admin/posyandu/${posyandu.id}`}
+                                            className="text-indigo-600 hover:underline font-semibold"
+                                        >
+                                            {posyandu.name}
+                                        </Link>
                                     </td>
                                     <td className="px-5 py-4 border-b text-sm">
-                                        <p>{`RT ${posyandu.rt}/${posyandu.rw}, ${posyandu.address}`}</p>
+                                        <p>{posyandu.puskesmas_pembina}</p>
                                     </td>
                                     <td className="px-5 py-4 border-b text-sm">
-                                        <p>{posyandu.village?.name || "N/A"}</p>
-                                    </td>
-                                    <td className="px-5 py-4 border-b text-sm">
-                                        <p>
-                                            {posyandu.village?.district?.name ||
-                                                "N/A"}
-                                        </p>
+                                        <p>{`RT ${posyandu.rt}/${
+                                            posyandu.rw
+                                        }, ${posyandu.address}, Desa ${
+                                            posyandu.village?.name || ""
+                                        }`}</p>
                                     </td>
                                     <td className="px-5 py-4 border-b text-sm">
                                         <div className="flex gap-2">
@@ -299,9 +293,10 @@ export default function PosyanduPage() {
                                     {error}
                                 </p>
                             )}
+
                             <div className="mb-4">
                                 <label className="block text-sm font-medium">
-                                    Nama Posyandu
+                                    Nama Posyandu*
                                 </label>
                                 <input
                                     type="text"
@@ -312,14 +307,28 @@ export default function PosyanduPage() {
                                     required
                                 />
                             </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium">
+                                    Puskesmas Pembina*
+                                </label>
+                                <input
+                                    type="text"
+                                    name="puskesmas_pembina"
+                                    value={formData.puskesmas_pembina}
+                                    onChange={handleInputChange}
+                                    className="mt-1 w-full rounded border-gray-300 shadow-sm"
+                                    required
+                                />
+                            </div>
+
                             <hr className="my-4" />
                             <p className="text-sm font-medium mb-2">
-                                Pilih Lokasi
+                                Pilih Lokasi Wilayah
                             </p>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm">
-                                        Provinsi
+                                        Provinsi*
                                     </label>
                                     <select
                                         name="province_id"
@@ -338,7 +347,7 @@ export default function PosyanduPage() {
                                 </div>
                                 <div>
                                     <label className="block text-sm">
-                                        Kabupaten/Kota
+                                        Kabupaten/Kota*
                                     </label>
                                     <select
                                         name="regency_id"
@@ -346,7 +355,10 @@ export default function PosyanduPage() {
                                         onChange={handleWilayahChange}
                                         className="mt-1 w-full rounded border-gray-300 shadow-sm"
                                         required
-                                        disabled={regencies.length === 0}
+                                        disabled={
+                                            !selectedWilayah.province_id ||
+                                            regencies.length === 0
+                                        }
                                     >
                                         <option value="">
                                             Pilih Kabupaten/Kota
@@ -360,7 +372,7 @@ export default function PosyanduPage() {
                                 </div>
                                 <div>
                                     <label className="block text-sm">
-                                        Kecamatan
+                                        Kecamatan*
                                     </label>
                                     <select
                                         name="district_id"
@@ -368,7 +380,10 @@ export default function PosyanduPage() {
                                         onChange={handleWilayahChange}
                                         className="mt-1 w-full rounded border-gray-300 shadow-sm"
                                         required
-                                        disabled={districts.length === 0}
+                                        disabled={
+                                            !selectedWilayah.regency_id ||
+                                            districts.length === 0
+                                        }
                                     >
                                         <option value="">
                                             Pilih Kecamatan
@@ -382,7 +397,7 @@ export default function PosyanduPage() {
                                 </div>
                                 <div>
                                     <label className="block text-sm">
-                                        Desa/Kelurahan
+                                        Desa/Kelurahan*
                                     </label>
                                     <select
                                         name="village_id"
@@ -390,7 +405,10 @@ export default function PosyanduPage() {
                                         onChange={handleInputChange}
                                         className="mt-1 w-full rounded border-gray-300 shadow-sm"
                                         required
-                                        disabled={villages.length === 0}
+                                        disabled={
+                                            !selectedWilayah.district_id ||
+                                            villages.length === 0
+                                        }
                                     >
                                         <option value="">
                                             Pilih Desa/Kelurahan
@@ -403,13 +421,14 @@ export default function PosyanduPage() {
                                     </select>
                                 </div>
                             </div>
+
                             <hr className="my-4" />
                             <p className="text-sm font-medium mb-2">
                                 Detail Alamat
                             </p>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium">
-                                    Alamat Lengkap (Jalan/Dusun)
+                                    Alamat Lengkap (Jalan/Dusun)*
                                 </label>
                                 <textarea
                                     name="address"
@@ -421,7 +440,7 @@ export default function PosyanduPage() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm">RT</label>
+                                    <label className="block text-sm">RT*</label>
                                     <input
                                         type="text"
                                         name="rt"
@@ -432,7 +451,7 @@ export default function PosyanduPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm">RW</label>
+                                    <label className="block text-sm">RW*</label>
                                     <input
                                         type="text"
                                         name="rw"
@@ -443,6 +462,7 @@ export default function PosyanduPage() {
                                     />
                                 </div>
                             </div>
+
                             <div className="flex justify-end gap-4 mt-6">
                                 <button
                                     type="button"

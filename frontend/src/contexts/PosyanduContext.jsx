@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
 // 1. Membuat "wadah" untuk papan pengumuman kita
@@ -8,32 +8,36 @@ export const PosyanduContext = createContext();
 export const PosyanduProvider = ({ children }) => {
     const [posyandus, setPosyandus] = useState([]);
     const token = localStorage.getItem("auth_token");
+    const API_CONFIG = { headers: { Authorization: `Bearer ${token}` } };
 
-    // Ambil data posyandu sekali saja saat provider ini dimuat
-    useEffect(() => {
+    // Buat fungsi untuk mengambil data yang bisa dipanggil ulang
+    const fetchPosyandus = useCallback(async () => {
         if (token) {
-            // PERBAIKAN 1: Alamat API diubah menjadi /posyandus (dengan 's')
-            axios
-                .get("http://localhost:8000/api/posyandus", {
-                    headers: { Authorization: `Bearer ${token}` },
-                })
-                .then((response) => {
-                    setPosyandus(response.data);
-                })
-                .catch((error) =>
-                    console.error(
-                        "Gagal mengambil data posyandu global:",
-                        error
-                    )
+            try {
+                const response = await axios.get(
+                    "http://localhost:8000/api/posyandus",
+                    API_CONFIG
                 );
+                setPosyandus(response.data);
+            } catch (error) {
+                console.error("Gagal mengambil data Posyandu global:", error);
+            }
         }
-        // PERBAIKAN 2: Ubah dependency array menjadi kosong []
-        // Ini memastikan useEffect hanya berjalan satu kali saja.
-    }, []);
+    }, [token]); // useCallback akan mengingat fungsi ini selama token tidak berubah
 
-    // Sediakan data posyandu ke semua "anak" komponen
+    // Ambil data posyandu sekali saja saat provider ini pertama kali dimuat
+    useEffect(() => {
+        fetchPosyandus();
+    }, [fetchPosyandus]);
+
+    // Sediakan data posyandu DAN fungsi untuk me-refreshnya
+    const value = {
+        posyandus,
+        refreshPosyandus: fetchPosyandus,
+    };
+
     return (
-        <PosyanduContext.Provider value={posyandus}>
+        <PosyanduContext.Provider value={value}>
             {children}
         </PosyanduContext.Provider>
     );

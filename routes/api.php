@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Rute CRUD lengkap menggunakan apiResource
     Route::apiResource('/posyandus', PosyanduController::class);
+    Route::get('/posyandus/{posyandu}/pendamping', [PosyanduController::class, 'getPendamping']);
     Route::apiResource('/kaders', KaderController::class);
     Route::apiResource('/ibus', IbuController::class);
     Route::apiResource('/anaks', AnakController::class);

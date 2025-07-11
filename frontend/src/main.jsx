@@ -7,16 +7,19 @@ import {
 } from "react-router-dom";
 import "./index.css";
 
-// Impor komponen inti
+// --- Impor Komponen Inti ---
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
 import MainLayout from "./components/layout/MainLayout.jsx";
+import { PosyanduProvider } from "./contexts/PosyanduContext.jsx";
 
-// Impor Semua Halaman
+// --- Impor Semua Halaman ---
 import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import PosyanduPage from "./pages/PosyanduPage.jsx";
+import PosyanduDetailPage from "./pages/PosyanduDetailPage.jsx";
 import KaderPage from "./pages/KaderPage.jsx";
+import KaderDetailPage from "./pages/KaderDetailPage.jsx"; // <-- 1. IMPORT HALAMAN DETAIL KADER
 import IbuPage from "./pages/IbuPage.jsx";
 import AnakPage from "./pages/AnakPage.jsx";
 import PemeriksaanIbuPage from "./pages/PemeriksaanIbuPage.jsx";
@@ -35,11 +38,24 @@ const router = createBrowserRouter([
                 children: [
                     {
                         path: "/admin",
-                        element: <MainLayout />,
+                        element: (
+                            <PosyanduProvider>
+                                <MainLayout />
+                            </PosyanduProvider>
+                        ),
                         children: [
                             { path: "dashboard", element: <DashboardPage /> },
                             { path: "posyandu", element: <PosyanduPage /> },
+                            {
+                                path: "posyandu/:posyanduId",
+                                element: <PosyanduDetailPage />,
+                            },
                             { path: "kader", element: <KaderPage /> },
+                            // 2. TAMBAHKAN RUTE DETAIL KADER DI SINI
+                            {
+                                path: "kader/:kaderId",
+                                element: <KaderDetailPage />,
+                            },
                             { path: "ibu", element: <IbuPage /> },
                             { path: "anak", element: <AnakPage /> },
                             {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Plus, Edit, Trash2 } from "lucide-react";
 
-// State awal untuk form Anak
+// State awal yang bersih untuk form Anak
 const initialFormState = {
     is_ibu_terdaftar: true,
     ibu_id: "",
@@ -35,7 +35,8 @@ const initialWilayahState = {
 export default function AnakPage() {
     const [anaks, setAnaks] = useState([]);
     const [ibus, setIbus] = useState([]);
-    const [posyandus, setPosyandus] = useState([]);
+    const [allPosyandus, setAllPosyandus] = useState([]); // Menyimpan SEMUA posyandu
+    const [filteredPosyandus, setFilteredPosyandus] = useState([]); // Menyimpan posyandu yang sudah difilter
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState(initialFormState);
@@ -71,7 +72,7 @@ export default function AnakPage() {
                 ]);
             setAnaks(anakRes.data);
             setIbus(ibuRes.data);
-            setPosyandus(posyanduRes.data);
+            setAllPosyandus(posyanduRes.data); // Simpan semua posyandu di sini
             setProvinces(provinceRes.data);
         } catch (error) {
             console.error("Gagal mengambil data awal:", error);
@@ -116,29 +117,74 @@ export default function AnakPage() {
         }
     }, [selectedWilayah.district_id]);
 
-    // --- LOGIKA ISI OTOMATIS SAAT IBU DIPILIH ---
+    // --- LOGIKA ISI OTOMATIS & FILTER POSYANDU ---
     useEffect(() => {
-        if (formData.ibu_id) {
+        let villageIdToFilter = null;
+        // Skenario 1: Ibu terdaftar, gunakan village_id dari posyandu si Ibu
+        if (formData.ibu_id && formData.is_ibu_terdaftar) {
             const selectedIbu = ibus.find(
                 (i) => i.id === parseInt(formData.ibu_id)
             );
             if (selectedIbu) {
                 setFormData((prev) => ({
                     ...prev,
-                    nomor_kk: selectedIbu.nomor_kk,
-                    // Isi otomatis data lain jika perlu
+                    nomor_kk: selectedIbu.nomor_kk || "",
                 }));
+                if (selectedIbu.posyandu) {
+                    villageIdToFilter = selectedIbu.posyandu.village_id;
+                }
             }
         }
-    }, [formData.ibu_id, ibus]);
+        // Skenario 2: Ibu tidak terdaftar, gunakan village_id dari dropdown alamat manual
+        else if (!formData.is_ibu_terdaftar && formData.village_id) {
+            villageIdToFilter = formData.village_id;
+        }
 
+        // Lakukan filter jika ada village_id yang valid
+        if (villageIdToFilter) {
+            const relevantPosyandus = allPosyandus.filter(
+                (p) => p.village_id === villageIdToFilter
+            );
+            setFilteredPosyandus(relevantPosyandus);
+        } else {
+            setFilteredPosyandus([]); // Kosongkan jika tidak ada desa terpilih
+        }
+        // Reset pilihan posyandu setiap kali desa berubah
+        setFormData((prev) => ({ ...prev, posyandu_id: "" }));
+    }, [
+        formData.ibu_id,
+        formData.village_id,
+        formData.is_ibu_terdaftar,
+        ibus,
+        allPosyandus,
+    ]);
+
+    // --- PERBAIKAN: Fungsi Input dengan Filter Angka ---
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         const finalValue = type === "checkbox" ? checked : value;
 
-        // Reset form jika beralih mode
-        if (name === "is_ibu_terdaftar") {
-            setFormData({ ...initialFormState, is_ibu_terdaftar: finalValue });
+        const numericFields = [
+            "nik",
+            "nomor_kk",
+            "anak_ke",
+            "bb_lahir",
+            "pb_lahir",
+            "nik_ibu_manual",
+            "rt_manual",
+            "rw_manual",
+        ];
+
+        if (name === "is_ibu_terdaftar" || name === "is_nik_exists") {
+            setFormData((prev) => ({
+                ...prev,
+                [name]: finalValue,
+                nik: "",
+                nomor_kk: "",
+            }));
+        } else if (numericFields.includes(name)) {
+            const numericValue = value.replace(/[^0-9]/g, "");
+            setFormData((prev) => ({ ...prev, [name]: numericValue }));
         } else {
             setFormData((prev) => ({ ...prev, [name]: finalValue }));
         }
@@ -165,7 +211,7 @@ export default function AnakPage() {
         if (name === "district_id") {
             setVillages([]);
         }
-        setFormData((prev) => ({ ...prev, alamat_lengkap_manual: "" }));
+        setFormData((prev) => ({ ...prev, village_id: "" }));
     };
 
     const openTambahModal = () => {
@@ -188,7 +234,7 @@ export default function AnakPage() {
         const method = editingAnak ? "put" : "post";
         try {
             const response = await axios[method](url, formData, API_CONFIG);
-            fetchData(); // Refresh data setelah berhasil
+            fetchData();
             setIsModalOpen(false);
         } catch (err) {
             if (err.response && err.response.status === 422) {
@@ -357,27 +403,111 @@ export default function AnakPage() {
                                                 className="mt-1 w-full rounded"
                                             />
                                         </div>
-                                        {/* PERBAIKAN: Tambahkan dropdown Posyandu di sini */}
-                                        <div className="md:col-span-2">
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                        <div>
                                             <label className="block text-sm">
-                                                Posyandu Pembina*
+                                                Provinsi*
                                             </label>
                                             <select
-                                                name="posyandu_id"
-                                                value={formData.posyandu_id}
-                                                onChange={handleInputChange}
+                                                name="province_id"
+                                                value={
+                                                    selectedWilayah.province_id
+                                                }
+                                                onChange={handleWilayahChange}
                                                 className="mt-1 w-full rounded"
-                                                required
                                             >
                                                 <option value="">
-                                                    Pilih Posyandu
+                                                    Pilih Provinsi
                                                 </option>
-                                                {posyandus.map((p) => (
+                                                {provinces.map((p) => (
                                                     <option
                                                         key={p.id}
                                                         value={p.id}
                                                     >
                                                         {p.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm">
+                                                Kabupaten/Kota*
+                                            </label>
+                                            <select
+                                                name="regency_id"
+                                                value={
+                                                    selectedWilayah.regency_id
+                                                }
+                                                onChange={handleWilayahChange}
+                                                className="mt-1 w-full rounded"
+                                                disabled={
+                                                    !selectedWilayah.province_id
+                                                }
+                                            >
+                                                <option value="">
+                                                    Pilih Kabupaten/Kota
+                                                </option>
+                                                {regencies.map((r) => (
+                                                    <option
+                                                        key={r.id}
+                                                        value={r.id}
+                                                    >
+                                                        {r.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm">
+                                                Kecamatan*
+                                            </label>
+                                            <select
+                                                name="district_id"
+                                                value={
+                                                    selectedWilayah.district_id
+                                                }
+                                                onChange={handleWilayahChange}
+                                                className="mt-1 w-full rounded"
+                                                disabled={
+                                                    !selectedWilayah.regency_id
+                                                }
+                                            >
+                                                <option value="">
+                                                    Pilih Kecamatan
+                                                </option>
+                                                {districts.map((d) => (
+                                                    <option
+                                                        key={d.id}
+                                                        value={d.id}
+                                                    >
+                                                        {d.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm">
+                                                Desa/Kelurahan*
+                                            </label>
+                                            <select
+                                                name="village_id"
+                                                value={formData.village_id}
+                                                onChange={handleInputChange}
+                                                className="mt-1 w-full rounded"
+                                                disabled={
+                                                    !selectedWilayah.district_id
+                                                }
+                                            >
+                                                <option value="">
+                                                    Pilih Desa/Kelurahan
+                                                </option>
+                                                {villages.map((v) => (
+                                                    <option
+                                                        key={v.id}
+                                                        value={v.id}
+                                                    >
+                                                        {v.name}
                                                     </option>
                                                 ))}
                                             </select>
@@ -428,6 +558,27 @@ export default function AnakPage() {
                                     </div>
                                 </section>
                             )}
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium">
+                                    Posyandu Pembina*
+                                </label>
+                                <select
+                                    name="posyandu_id"
+                                    value={formData.posyandu_id}
+                                    onChange={handleInputChange}
+                                    className="mt-1 w-full rounded"
+                                    required
+                                    disabled={filteredPosyandus.length === 0}
+                                >
+                                    <option value="">Pilih Posyandu</option>
+                                    {filteredPosyandus.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
 
                             <hr className="my-6" />
                             <h3 className="text-lg font-semibold text-indigo-700 border-b pb-2 mb-4">

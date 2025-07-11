@@ -14,16 +14,27 @@ use Illuminate\Validation\Rules;
 class KaderController extends Controller
 {
     /**
-     * Menampilkan daftar semua kader.
+     * Menampilkan daftar semua kader (Versi Cepat dengan Pagination).
      */
     public function index()
     {
-        return Kader::with([
+        // PERUBAHAN DI SINI: Gunakan paginate() bukan get()
+        // Ini akan otomatis membagi data, misalnya 15 data per halaman.
+        return Kader::with(['user', 'posyandu'])->latest()->paginate(15);
+    }
+
+    /**
+     * Menampilkan satu data kader spesifik (Versi Lengkap).
+     */
+    public function show(Kader $kader)
+    {
+        // SAAT MELIHAT DETAIL, BARU KITA AMBIL SEMUA DATA LENGKAPNYA
+        return $kader->load([
             'user', 
             'posyandu', 
             'ktpVillage.district.regency.province', 
             'domisiliVillage.district.regency.province'
-        ])->latest()->get();
+        ]);
     }
 
     /**
@@ -31,7 +42,6 @@ class KaderController extends Controller
      */
     public function store(Request $request)
     {
-        // Validasi untuk semua field dari form lengkap
         $validatedData = $request->validate([
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -61,8 +71,6 @@ class KaderController extends Controller
 
         try {
             DB::beginTransaction();
-
-            // 1. Buat data untuk tabel 'users'
             $user = User::create([
                 'name' => $validatedData['nama_lengkap'],
                 'email' => $validatedData['email'],
@@ -70,17 +78,12 @@ class KaderController extends Controller
                 'role' => 'KADER',
             ]);
 
-            // 2. Buat data untuk tabel 'kaders'
-            // Ambil semua data dari request KECUALI data untuk user
-            $kaderData = $request->except(['email', 'password', 'password_confirmation']);
-            
-            $kader = new Kader($kaderData);
-            $kader->user_id = $user->id; // Hubungkan dengan user yang baru dibuat
+            $kader = new Kader($validatedData);
+            $kader->user_id = $user->id;
             $kader->save();
             
             DB::commit();
             return response()->json($kader->load('user', 'posyandu'), 201);
-
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Gagal membuat data kader.', 'error' => $e->getMessage()], 500);
@@ -121,7 +124,6 @@ class KaderController extends Controller
 
         try {
             DB::beginTransaction();
-            // Update data user
             if ($kader->user) {
                 $kader->user->update([
                     'name' => $validatedData['nama_lengkap'],
@@ -131,8 +133,7 @@ class KaderController extends Controller
                     $kader->user->update(['password' => Hash::make($request->password)]);
                 }
             }
-            // Update data kader dengan data yang relevan saja
-            $kader->update($request->except(['email', 'password', 'password_confirmation']));
+            $kader->update($validatedData);
             
             DB::commit();
             return response()->json($kader->load('user', 'posyandu'));
