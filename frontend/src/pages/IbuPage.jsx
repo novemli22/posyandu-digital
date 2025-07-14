@@ -410,7 +410,12 @@ export default function IbuPage() {
                             {ibus.map((ibu) => (
                                 <tr key={ibu.id} className="hover:bg-gray-50">
                                     <td className="px-5 py-4 border-b text-sm">
-                                        <p>{ibu.nama_lengkap}</p>
+                                        <Link
+                                            to={`/admin/ibu/${ibu.id}`}
+                                            className="text-indigo-600 hover:underline font-semibold"
+                                        >
+                                            {ibu.nama_lengkap}
+                                        </Link>
                                     </td>
                                     <td className="px-5 py-4 border-b text-sm">
                                         <p>{ibu.nik || "N/A"}</p>

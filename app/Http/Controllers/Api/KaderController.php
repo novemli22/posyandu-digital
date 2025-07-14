@@ -16,10 +16,8 @@ class KaderController extends Controller
     /**
      * Menampilkan daftar semua kader (Versi Cepat dengan Pagination).
      */
-    public function index()
+    public function index(Request $request)
     {
-        // PERUBAHAN DI SINI: Gunakan paginate() bukan get()
-        // Ini akan otomatis membagi data, misalnya 15 data per halaman.
         return Kader::with(['user', 'posyandu'])->latest()->paginate(15);
     }
 
@@ -28,7 +26,6 @@ class KaderController extends Controller
      */
     public function show(Kader $kader)
     {
-        // SAAT MELIHAT DETAIL, BARU KITA AMBIL SEMUA DATA LENGKAPNYA
         return $kader->load([
             'user', 
             'posyandu', 
@@ -71,6 +68,7 @@ class KaderController extends Controller
 
         try {
             DB::beginTransaction();
+
             $user = User::create([
                 'name' => $validatedData['nama_lengkap'],
                 'email' => $validatedData['email'],
@@ -78,12 +76,15 @@ class KaderController extends Controller
                 'role' => 'KADER',
             ]);
 
-            $kader = new Kader($validatedData);
+            $kaderData = collect($validatedData)->except(['email', 'password', 'password_confirmation'])->all();
+            
+            $kader = new Kader($kaderData);
             $kader->user_id = $user->id;
             $kader->save();
             
             DB::commit();
             return response()->json($kader->load('user', 'posyandu'), 201);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Gagal membuat data kader.', 'error' => $e->getMessage()], 500);
@@ -133,7 +134,10 @@ class KaderController extends Controller
                     $kader->user->update(['password' => Hash::make($request->password)]);
                 }
             }
-            $kader->update($validatedData);
+            
+            // PERBAIKAN FINAL: Gunakan data yang sudah divalidasi dan pisahkan
+            $kaderData = collect($validatedData)->except(['email', 'password', 'password_confirmation'])->all();
+            $kader->update($kaderData);
             
             DB::commit();
             return response()->json($kader->load('user', 'posyandu'));

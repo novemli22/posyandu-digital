@@ -21,6 +21,7 @@ import PosyanduDetailPage from "./pages/PosyanduDetailPage.jsx";
 import KaderPage from "./pages/KaderPage.jsx";
 import KaderDetailPage from "./pages/KaderDetailPage.jsx"; // <-- 1. IMPORT HALAMAN DETAIL KADER
 import IbuPage from "./pages/IbuPage.jsx";
+import IbuDetailPage from "./pages/IbuDetailPage.jsx";
 import AnakPage from "./pages/AnakPage.jsx";
 import PemeriksaanIbuPage from "./pages/PemeriksaanIbuPage.jsx";
 import PemeriksaanAnakPage from "./pages/PemeriksaanAnakPage.jsx";
@@ -57,6 +58,10 @@ const router = createBrowserRouter([
                                 element: <KaderDetailPage />,
                             },
                             { path: "ibu", element: <IbuPage /> },
+                            {
+                                path: "ibu/:ibuId",
+                                element: <IbuDetailPage />,
+                            },
                             { path: "anak", element: <AnakPage /> },
                             {
                                 path: "pemeriksaan-ibu",

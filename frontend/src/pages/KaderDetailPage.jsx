@@ -4,10 +4,14 @@ import axios from "axios";
 import {
     ArrowLeft,
     User,
-    Home,
     MapPin,
     Award,
     ShieldCheck,
+    Phone,
+    Mail,
+    Home,
+    CheckCircle,
+    XCircle,
 } from "lucide-react";
 
 export default function KaderDetailPage() {
@@ -37,7 +41,29 @@ export default function KaderDetailPage() {
             }
         };
         fetchData();
-    }, [kaderId]);
+    }, [kaderId]); // Jalankan lagi jika ID di URL berubah
+
+    // Komponen kecil untuk menampilkan item detail agar rapi
+    const DetailItem = ({ label, value, className = "" }) => (
+        <div className={className}>
+            <p className="text-sm text-gray-500">{label}</p>
+            <p className="text-md font-semibold text-gray-800">
+                {value || "-"}
+            </p>
+        </div>
+    );
+
+    // Komponen untuk menampilkan status boolean (Ya/Tidak) dengan badge
+    const StatusBadge = ({ label, value }) => (
+        <div className="flex items-center gap-2">
+            {value ? (
+                <CheckCircle size={18} className="text-green-500" />
+            ) : (
+                <XCircle size={18} className="text-red-500" />
+            )}
+            <span className="text-md text-gray-700">{label}</span>
+        </div>
+    );
 
     if (loading)
         return (
@@ -50,15 +76,6 @@ export default function KaderDetailPage() {
             <div className="p-10 text-center">Data kader tidak ditemukan.</div>
         );
 
-    const DetailItem = ({ label, value }) => (
-        <div>
-            <p className="text-sm text-gray-500">{label}</p>
-            <p className="text-md font-semibold text-gray-800">
-                {value || "-"}
-            </p>
-        </div>
-    );
-
     return (
         <div>
             <Link
@@ -70,6 +87,7 @@ export default function KaderDetailPage() {
             </Link>
 
             <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+                {/* Header Detail */}
                 <div className="flex flex-col sm:flex-row items-start gap-4 mb-6 pb-6 border-b">
                     <div className="bg-indigo-100 p-4 rounded-full">
                         <User className="h-10 w-10 text-indigo-600" />
@@ -81,13 +99,43 @@ export default function KaderDetailPage() {
                         <p className="text-md text-gray-500">
                             NIK: {kader.nik}
                         </p>
-                        <p className="text-md text-gray-500">
-                            Email: {kader.user?.email}
-                        </p>
+                        <div className="flex items-center gap-4 mt-2">
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Mail size={14} /> {kader.user?.email}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Phone size={14} /> {kader.nomor_hp}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div className="space-y-8">
+                    {/* Informasi Pribadi & Penugasan */}
+                    <section>
+                        <h3 className="font-bold text-xl text-gray-800 mb-3">
+                            Informasi Pribadi & Penugasan
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-lg">
+                            <DetailItem
+                                label="Tanggal Lahir"
+                                value={kader.tanggal_lahir}
+                            />
+                            <DetailItem
+                                label="Jenis Kelamin"
+                                value={kader.jenis_kelamin}
+                            />
+                            <DetailItem
+                                label="Posyandu Bertugas"
+                                value={kader.posyandu?.name}
+                            />
+                            <DetailItem
+                                label="Memiliki JKN/KIS"
+                                value={kader.memiliki_jkn ? "Ya" : "Tidak"}
+                            />
+                        </div>
+                    </section>
+
                     {/* Alamat KTP */}
                     <section>
                         <h3 className="font-bold text-xl text-gray-800 mb-3 flex items-center gap-2">
@@ -97,6 +145,7 @@ export default function KaderDetailPage() {
                             <DetailItem
                                 label="Alamat"
                                 value={`${kader.ktp_address}, RT ${kader.ktp_rt}/RW ${kader.ktp_rw}`}
+                                className="col-span-2 md:col-span-4"
                             />
                             <DetailItem
                                 label="Desa/Kelurahan"
@@ -110,6 +159,13 @@ export default function KaderDetailPage() {
                                 label="Kabupaten/Kota"
                                 value={
                                     kader.ktp_village?.district?.regency?.name
+                                }
+                            />
+                            <DetailItem
+                                label="Provinsi"
+                                value={
+                                    kader.ktp_village?.district?.regency
+                                        ?.province?.name
                                 }
                             />
                         </div>
@@ -129,6 +185,7 @@ export default function KaderDetailPage() {
                                 <DetailItem
                                     label="Alamat"
                                     value={`${kader.domisili_address}, RT ${kader.domisili_rt}/RW ${kader.domisili_rw}`}
+                                    className="col-span-2 md:col-span-4"
                                 />
                                 <DetailItem
                                     label="Desa/Kelurahan"
@@ -147,6 +204,13 @@ export default function KaderDetailPage() {
                                             ?.regency?.name
                                     }
                                 />
+                                <DetailItem
+                                    label="Provinsi"
+                                    value={
+                                        kader.domisili_village?.district
+                                            ?.regency?.province?.name
+                                    }
+                                />
                             </div>
                         )}
                     </section>
@@ -157,42 +221,27 @@ export default function KaderDetailPage() {
                             <Award size={20} /> Kompetensi
                         </h3>
                         <div className="p-4 border rounded-lg">
-                            <p className="font-semibold mb-2">
+                            <p className="font-semibold mb-3">
                                 Riwayat Pelatihan:
                             </p>
                             <div className="flex gap-4 flex-wrap">
-                                <span
-                                    className={`px-3 py-1 text-sm rounded-full ${
-                                        kader.pelatihan_posyandu
-                                            ? "bg-green-100 text-green-800"
-                                            : "bg-gray-100 text-gray-600"
-                                    }`}
-                                >
-                                    Pengelolaan Posyandu
-                                </span>
-                                <span
-                                    className={`px-3 py-1 text-sm rounded-full ${
-                                        kader.pelatihan_ibu_hamil
-                                            ? "bg-green-100 text-green-800"
-                                            : "bg-gray-100 text-gray-600"
-                                    }`}
-                                >
-                                    Kesehatan Ibu
-                                </span>
-                                <span
-                                    className={`px-3 py-1 text-sm rounded-full ${
-                                        kader.pelatihan_balita
-                                            ? "bg-green-100 text-green-800"
-                                            : "bg-gray-100 text-gray-600"
-                                    }`}
-                                >
-                                    Kesehatan Balita
-                                </span>
+                                <StatusBadge
+                                    label="Pengelolaan Posyandu"
+                                    value={kader.pelatihan_posyandu}
+                                />
+                                <StatusBadge
+                                    label="Kesehatan Ibu Hamil/Nifas"
+                                    value={kader.pelatihan_ibu_hamil}
+                                />
+                                <StatusBadge
+                                    label="Kesehatan Balita"
+                                    value={kader.pelatihan_balita}
+                                />
                             </div>
                             <p className="font-semibold mt-4 mb-2">
-                                Jumlah TKK:
+                                Jumlah Tanda Kecakapan Kader (TKK):
                             </p>
-                            <div className="flex gap-4 flex-wrap">
+                            <div className="flex gap-6 flex-wrap">
                                 <DetailItem
                                     label="TKK Posyandu"
                                     value={kader.tkk_posyandu}

@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import { Plus, Edit, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { PosyanduContext } from "../contexts/PosyanduContext";
 
 // State awal yang bersih untuk form Anak
 const initialFormState = {
     is_ibu_terdaftar: true,
     ibu_id: "",
+    // Data Ibu Manual
     nama_ibu_manual: "",
     nik_ibu_manual: "",
-    posyandu_id: "",
-    alamat_lengkap_manual: "",
-    rt_manual: "",
-    rw_manual: "",
+    email: "",
+    password: "",
+    password_confirmation: "",
+    // Data Anak
     nama_lengkap: "",
     is_nik_exists: true,
     nik: "",
@@ -23,56 +26,61 @@ const initialFormState = {
     pb_lahir: "",
     punya_buku_kia: true,
     is_imd: false,
+    // Data Alamat & Posyandu Manual
+    posyandu_id: "",
+    alamat_lengkap_manual: "",
+    rt_manual: "",
+    rw_manual: "",
+    village_id: "",
 };
 
 const initialWilayahState = {
     province_id: "",
     regency_id: "",
     district_id: "",
-    village_id: "",
 };
 
 export default function AnakPage() {
     const [anaks, setAnaks] = useState([]);
     const [ibus, setIbus] = useState([]);
-    const [allPosyandus, setAllPosyandus] = useState([]); // Menyimpan SEMUA posyandu
-    const [filteredPosyandus, setFilteredPosyandus] = useState([]); // Menyimpan posyandu yang sudah difilter
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState(initialFormState);
     const [error, setError] = useState("");
     const [editingAnak, setEditingAnak] = useState(null);
 
-    // State untuk dropdown wilayah (hanya untuk mode manual)
+    const [pagination, setPagination] = useState({});
+    const [currentPage, setCurrentPage] = useState(1);
+
     const [provinces, setProvinces] = useState([]);
     const [regencies, setRegencies] = useState([]);
     const [districts, setDistricts] = useState([]);
     const [villages, setVillages] = useState([]);
     const [selectedWilayah, setSelectedWilayah] = useState(initialWilayahState);
+    const [filteredPosyandus, setFilteredPosyandus] = useState([]);
 
+    const { posyandus: allPosyandus } = useContext(PosyanduContext);
     const token = localStorage.getItem("auth_token");
     const API_CONFIG = { headers: { Authorization: `Bearer ${token}` } };
 
-    // --- FUNGSI FETCH DATA ---
-    const fetchData = async () => {
+    // --- LOGIKA ---
+    const fetchData = async (page) => {
         setLoading(true);
         try {
-            const [anakRes, ibuRes, posyanduRes, provinceRes] =
-                await Promise.all([
-                    axios.get("http://localhost:8000/api/anaks", API_CONFIG),
-                    axios.get("http://localhost:8000/api/ibus", API_CONFIG),
-                    axios.get(
-                        "http://localhost:8000/api/posyandus",
-                        API_CONFIG
-                    ),
-                    axios.get(
-                        "http://localhost:8000/api/wilayah/provinces",
-                        API_CONFIG
-                    ),
-                ]);
-            setAnaks(anakRes.data);
+            const [anakRes, ibuRes, provinceRes] = await Promise.all([
+                axios.get(
+                    `http://localhost:8000/api/anaks?page=${page}`,
+                    API_CONFIG
+                ),
+                axios.get("http://localhost:8000/api/ibus", API_CONFIG),
+                axios.get(
+                    "http://localhost:8000/api/wilayah/provinces",
+                    API_CONFIG
+                ),
+            ]);
+            setAnaks(anakRes.data.data);
+            setPagination(anakRes.data);
             setIbus(ibuRes.data);
-            setAllPosyandus(posyanduRes.data); // Simpan semua posyandu di sini
             setProvinces(provinceRes.data);
         } catch (error) {
             console.error("Gagal mengambil data awal:", error);
@@ -82,10 +90,9 @@ export default function AnakPage() {
     };
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        fetchData(currentPage);
+    }, [currentPage]);
 
-    // --- LOGIKA CASCADING DROPDOWN (UNTUK MODE MANUAL) ---
     useEffect(() => {
         if (selectedWilayah.province_id) {
             axios
@@ -117,10 +124,7 @@ export default function AnakPage() {
         }
     }, [selectedWilayah.district_id]);
 
-    // --- LOGIKA ISI OTOMATIS & FILTER POSYANDU ---
     useEffect(() => {
-        let villageIdToFilter = null;
-        // Skenario 1: Ibu terdaftar, gunakan village_id dari posyandu si Ibu
         if (formData.ibu_id && formData.is_ibu_terdaftar) {
             const selectedIbu = ibus.find(
                 (i) => i.id === parseInt(formData.ibu_id)
@@ -130,61 +134,37 @@ export default function AnakPage() {
                     ...prev,
                     nomor_kk: selectedIbu.nomor_kk || "",
                 }));
-                if (selectedIbu.posyandu) {
-                    villageIdToFilter = selectedIbu.posyandu.village_id;
-                }
             }
+        } else if (!formData.is_ibu_terdaftar) {
+            // Jika ibu baru, KK diisi manual, jadi kita kosongkan
+            setFormData((prev) => ({ ...prev, nomor_kk: "" }));
         }
-        // Skenario 2: Ibu tidak terdaftar, gunakan village_id dari dropdown alamat manual
-        else if (!formData.is_ibu_terdaftar && formData.village_id) {
-            villageIdToFilter = formData.village_id;
-        }
+    }, [formData.ibu_id, ibus, formData.is_ibu_terdaftar]);
 
-        // Lakukan filter jika ada village_id yang valid
-        if (villageIdToFilter) {
+    useEffect(() => {
+        if (formData.village_id && allPosyandus) {
             const relevantPosyandus = allPosyandus.filter(
-                (p) => p.village_id === villageIdToFilter
+                (p) => p.village_id === formData.village_id
             );
             setFilteredPosyandus(relevantPosyandus);
         } else {
-            setFilteredPosyandus([]); // Kosongkan jika tidak ada desa terpilih
+            setFilteredPosyandus([]);
         }
-        // Reset pilihan posyandu setiap kali desa berubah
-        setFormData((prev) => ({ ...prev, posyandu_id: "" }));
-    }, [
-        formData.ibu_id,
-        formData.village_id,
-        formData.is_ibu_terdaftar,
-        ibus,
-        allPosyandus,
-    ]);
+    }, [formData.village_id, allPosyandus]);
 
-    // --- PERBAIKAN: Fungsi Input dengan Filter Angka ---
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         const finalValue = type === "checkbox" ? checked : value;
 
-        const numericFields = [
-            "nik",
-            "nomor_kk",
-            "anak_ke",
-            "bb_lahir",
-            "pb_lahir",
-            "nik_ibu_manual",
-            "rt_manual",
-            "rw_manual",
-        ];
-
-        if (name === "is_ibu_terdaftar" || name === "is_nik_exists") {
-            setFormData((prev) => ({
-                ...prev,
-                [name]: finalValue,
-                nik: "",
-                nomor_kk: "",
-            }));
-        } else if (numericFields.includes(name)) {
-            const numericValue = value.replace(/[^0-9]/g, "");
-            setFormData((prev) => ({ ...prev, [name]: numericValue }));
+        if (name === "is_ibu_terdaftar") {
+            setFormData({ ...initialFormState, is_ibu_terdaftar: finalValue });
+            setSelectedWilayah(initialWilayahState);
+            setRegencies([]);
+            setDistricts([]);
+            setVillages([]);
+        } else if (name === "is_nik_exists") {
+            // PERBAIKAN: Checkbox ini hanya mengontrol NIK
+            setFormData((prev) => ({ ...prev, [name]: finalValue, nik: "" }));
         } else {
             setFormData((prev) => ({ ...prev, [name]: finalValue }));
         }
@@ -211,7 +191,7 @@ export default function AnakPage() {
         if (name === "district_id") {
             setVillages([]);
         }
-        setFormData((prev) => ({ ...prev, village_id: "" }));
+        setFormData((prev) => ({ ...prev, village_id: "", posyandu_id: "" }));
     };
 
     const openTambahModal = () => {
@@ -225,6 +205,10 @@ export default function AnakPage() {
         setIsModalOpen(true);
     };
 
+    const openEditModal = (anak) => {
+        /* ... (akan kita sempurnakan nanti) ... */
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
@@ -233,8 +217,8 @@ export default function AnakPage() {
             : "http://localhost:8000/api/anaks";
         const method = editingAnak ? "put" : "post";
         try {
-            const response = await axios[method](url, formData, API_CONFIG);
-            fetchData();
+            await axios[method](url, formData, API_CONFIG);
+            fetchData(editingAnak ? currentPage : 1);
             setIsModalOpen(false);
         } catch (err) {
             if (err.response && err.response.status === 422) {
@@ -243,6 +227,20 @@ export default function AnakPage() {
                 );
             } else {
                 setError("Terjadi kesalahan pada server.");
+            }
+        }
+    };
+
+    const handleDelete = async (anakId) => {
+        if (window.confirm("Yakin ingin menghapus data anak ini?")) {
+            try {
+                await axios.delete(
+                    `http://localhost:8000/api/anaks/${anakId}`,
+                    API_CONFIG
+                );
+                fetchData(currentPage);
+            } catch (error) {
+                alert("Gagal menghapus data anak.");
             }
         }
     };
@@ -304,10 +302,20 @@ export default function AnakPage() {
                                     </td>
                                     <td className="px-5 py-4 border-b text-sm">
                                         <div className="flex gap-2">
-                                            <button className="text-yellow-600">
+                                            <button
+                                                onClick={() =>
+                                                    openEditModal(anak)
+                                                }
+                                                className="text-yellow-600"
+                                            >
                                                 <Edit size={18} />
                                             </button>
-                                            <button className="text-red-600">
+                                            <button
+                                                onClick={() =>
+                                                    handleDelete(anak.id)
+                                                }
+                                                className="text-red-600"
+                                            >
                                                 <Trash2 size={18} />
                                             </button>
                                         </div>
@@ -347,7 +355,7 @@ export default function AnakPage() {
                                     htmlFor="is_ibu_terdaftar"
                                     className="text-sm font-medium"
                                 >
-                                    Ibu Sudah Terdaftar di Sistem
+                                    Orang Tua Sudah Terdaftar di Sistem
                                 </label>
                             </div>
 
@@ -374,13 +382,13 @@ export default function AnakPage() {
                                 </div>
                             ) : (
                                 <section className="p-4 border rounded-lg bg-gray-50 mb-4">
-                                    <h4 className="font-semibold mb-2 text-gray-700">
-                                        Input Data Ibu Baru
+                                    <h4 className="font-semibold mb-4 text-gray-700 border-b pb-2">
+                                        Input Data Orang Tua Baru
                                     </h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm">
-                                                Nama Ibu*
+                                                Nama Ibu/Wali*
                                             </label>
                                             <input
                                                 type="text"
@@ -393,7 +401,7 @@ export default function AnakPage() {
                                         </div>
                                         <div>
                                             <label className="block text-sm">
-                                                NIK Ibu
+                                                NIK Ibu/Wali
                                             </label>
                                             <input
                                                 type="text"
@@ -417,9 +425,7 @@ export default function AnakPage() {
                                                 onChange={handleWilayahChange}
                                                 className="mt-1 w-full rounded"
                                             >
-                                                <option value="">
-                                                    Pilih Provinsi
-                                                </option>
+                                                <option value="">Pilih</option>
                                                 {provinces.map((p) => (
                                                     <option
                                                         key={p.id}
@@ -432,7 +438,7 @@ export default function AnakPage() {
                                         </div>
                                         <div>
                                             <label className="block text-sm">
-                                                Kabupaten/Kota*
+                                                Kab/Kota*
                                             </label>
                                             <select
                                                 name="regency_id"
@@ -445,9 +451,7 @@ export default function AnakPage() {
                                                     !selectedWilayah.province_id
                                                 }
                                             >
-                                                <option value="">
-                                                    Pilih Kabupaten/Kota
-                                                </option>
+                                                <option value="">Pilih</option>
                                                 {regencies.map((r) => (
                                                     <option
                                                         key={r.id}
@@ -473,9 +477,7 @@ export default function AnakPage() {
                                                     !selectedWilayah.regency_id
                                                 }
                                             >
-                                                <option value="">
-                                                    Pilih Kecamatan
-                                                </option>
+                                                <option value="">Pilih</option>
                                                 {districts.map((d) => (
                                                     <option
                                                         key={d.id}
@@ -488,7 +490,7 @@ export default function AnakPage() {
                                         </div>
                                         <div>
                                             <label className="block text-sm">
-                                                Desa/Kelurahan*
+                                                Desa*
                                             </label>
                                             <select
                                                 name="village_id"
@@ -499,9 +501,7 @@ export default function AnakPage() {
                                                     !selectedWilayah.district_id
                                                 }
                                             >
-                                                <option value="">
-                                                    Pilih Desa/Kelurahan
-                                                </option>
+                                                <option value="">Pilih</option>
                                                 {villages.map((v) => (
                                                     <option
                                                         key={v.id}
@@ -512,6 +512,30 @@ export default function AnakPage() {
                                                 ))}
                                             </select>
                                         </div>
+                                    </div>
+                                    <div className="mt-4">
+                                        <label className="block text-sm">
+                                            Posyandu Pembina*
+                                        </label>
+                                        <select
+                                            name="posyandu_id"
+                                            value={formData.posyandu_id}
+                                            onChange={handleInputChange}
+                                            className="mt-1 w-full rounded"
+                                            required
+                                            disabled={
+                                                filteredPosyandus.length === 0
+                                            }
+                                        >
+                                            <option value="">
+                                                Pilih Posyandu
+                                            </option>
+                                            {filteredPosyandus.map((p) => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.name}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="mt-4">
                                         <label className="block text-sm">
@@ -556,29 +580,51 @@ export default function AnakPage() {
                                             />
                                         </div>
                                     </div>
+                                    <hr className="my-4" />
+                                    <p className="text-sm text-gray-600 mb-2">
+                                        Buat Akun Login untuk Ibu/Wali
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm">
+                                                Email*
+                                            </label>
+                                            <input
+                                                type="email"
+                                                name="email"
+                                                value={formData.email}
+                                                onChange={handleInputChange}
+                                                className="mt-1 w-full rounded"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm">
+                                                Password*
+                                            </label>
+                                            <input
+                                                type="password"
+                                                name="password"
+                                                onChange={handleInputChange}
+                                                className="mt-1 w-full rounded"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm">
+                                                Konfirmasi Password*
+                                            </label>
+                                            <input
+                                                type="password"
+                                                name="password_confirmation"
+                                                onChange={handleInputChange}
+                                                className="mt-1 w-full rounded"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
                                 </section>
                             )}
-
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium">
-                                    Posyandu Pembina*
-                                </label>
-                                <select
-                                    name="posyandu_id"
-                                    value={formData.posyandu_id}
-                                    onChange={handleInputChange}
-                                    className="mt-1 w-full rounded"
-                                    required
-                                    disabled={filteredPosyandus.length === 0}
-                                >
-                                    <option value="">Pilih Posyandu</option>
-                                    {filteredPosyandus.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
 
                             <hr className="my-6" />
                             <h3 className="text-lg font-semibold text-indigo-700 border-b pb-2 mb-4">
@@ -686,7 +732,7 @@ export default function AnakPage() {
                                         htmlFor="is_nik_exists"
                                         className="text-sm font-medium"
                                     >
-                                        Memiliki NIK & KK
+                                        Anak Memiliki NIK
                                     </label>
                                 </div>
                             </div>
@@ -706,15 +752,19 @@ export default function AnakPage() {
                                 </div>
                                 <div>
                                     <label className="block text-sm">
-                                        Nomor KK
+                                        Nomor KK*
                                     </label>
                                     <input
                                         type="text"
                                         name="nomor_kk"
                                         value={formData.nomor_kk}
                                         onChange={handleInputChange}
-                                        disabled={!formData.is_nik_exists}
+                                        disabled={
+                                            formData.is_ibu_terdaftar &&
+                                            !!formData.ibu_id
+                                        }
                                         className="mt-1 w-full rounded disabled:bg-gray-200"
+                                        required
                                     />
                                 </div>
                             </div>
@@ -749,7 +799,7 @@ export default function AnakPage() {
                                     </label>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-4 mt-6">
+                            <div className="flex justify-end gap-4 mt-6 pt-4 border-t">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
